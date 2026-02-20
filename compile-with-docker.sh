@@ -39,7 +39,7 @@ fi
 # ---------------------------------------------
 # Clean existing CMake cache to ensure toolchain reload
 # ---------------------------------------------
-rm -rf build
+# rm -rf build
 export MSYS_NO_PATHCONV=1
 # ---------------------------------------------
 # Function to build one preset

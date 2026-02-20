@@ -9,7 +9,7 @@
 #include "action.h"
 #include "bands.h"
 #include "ui/main.h"
-//#include "debugging.h"
+#include "debugging.h"
 
 /*	
           /////////////////////////DEBUG//////////////////////////
@@ -131,8 +131,8 @@ static uint16_t ctcssFreq;
 #define Bottom_print 51 //Robby69
 static Mode appMode;
 #define UHF_NOISE_FLOOR 5
-static uint16_t scanChannel[MR_CHANNEL_LAST + 3];   //To solve LATER
-static uint8_t ScanListNumber[MR_CHANNEL_LAST + 3]; //To solve LATER
+static uint16_t scanChannel[MR_CHANNEL_LAST + 3];  
+static uint8_t ScanListNumber[MR_CHANNEL_LAST + 3];
 static uint16_t scanChannelsCount;
 static void ToggleScanList();
 static void SaveSettings();
@@ -480,6 +480,7 @@ static uint16_t GetStepsCount()
 
 static uint32_t GetBW() { return GetStepsCount() * GetScanStep(); }
 
+//To solve LATER
 /* static uint16_t GetRandomChannelFromRSSI(uint16_t maxChannels) {
   uint32_t rssi = rssiHistory[1]*rssiHistory[maxChannels/2];
   if (maxChannels == 0 || rssi == 0) {
@@ -497,15 +498,15 @@ static void DeInitSpectrum(bool ComeBack) {
   SetState(SPECTRUM);
   if(!ComeBack) {
     uint8_t Spectrum_state = 0; //Spectrum Not Active
-    EEPROM_WriteBuffer(0x1D00, &Spectrum_state);
+    EEPROM_WriteBuffer(0xD000, &Spectrum_state);
     ToggleRX(0);
     SYSTEM_DelayMs(50);
     }
     
   else {
-    EEPROM_ReadBuffer(0x1D00, &Spectrum_state, 1);
-	  Spectrum_state+=10;
-    EEPROM_WriteBuffer(0x1D00, &Spectrum_state);
+    EEPROM_ReadBuffer(0xD000, &Spectrum_state, 1);
+	Spectrum_state+=10;
+    EEPROM_WriteBuffer(0xD000, &Spectrum_state);
     //StorePtt_Toggle_Mode = Ptt_Toggle_Mode;To solve LATER
     SYSTEM_DelayMs(50);
     //Ptt_Toggle_Mode =0; //To solve LATER
@@ -624,7 +625,7 @@ static void SaveHistoryToFreeChannel(void) {
         tempVFO.OUTPUT_POWER = OUTPUT_POWER_LOW1;
         tempVFO.STEP_SETTING = STEP_12_5kHz; 
         // Sauvegarde propre via la fonction système
-        SETTINGS_SaveChannel(freeCh,0, &tempVFO, 2); //To solve LATER
+        SETTINGS_SaveChannel(freeCh,0, &tempVFO, 2);
 
         // Rafraichir les listes
         LoadValidMemoryChannels();
@@ -701,24 +702,19 @@ uint16_t BOARD_gMR_fetchChannel(const uint32_t freq)
 		return 0xFFFF;
 }
 
-/////////////////////////////EEPROM://///////////////////////////*/
-
 static void ExitAndCopyToVfo() {
   RestoreRegisters();
-
-//To solve LATER
-
-/* if (historyListActive == true){
-      //SETTINGS_SetVfoFrequency(HFreqs[historyListIndex]);
+if (historyListActive == true){
+      //To solve LATER SETTINGS_SetVfoFrequency(HFreqs[historyListIndex]); 
       gTxVfo->Modulation = MODULATION_FM;
       gRequestSaveChannel = 1;
       DeInitSpectrum(0);
 }
-  switch (currentState) {
+  /* switch (currentState) {
     case SPECTRUM:
       if (PttEmission ==1){
           uint16_t randomChannel = GetRandomChannelFromRSSI(scanChannelsCount);
-          //static uint32_t rndfreq;
+          static uint32_t rndfreq;
           uint16_t i = 0;
           SpectrumDelay = 0; //not compatible with ninja
 
@@ -727,10 +723,10 @@ static void ExitAndCopyToVfo() {
             randomChannel++;
             if (randomChannel >scanChannelsCount)randomChannel = 1;
             if (i > MR_CHANNEL_LAST) break;}
-          //rndfreq = gMR_ChannelFrequencyAttributes[scanChannel[randomChannel]].Frequency;
-          //SETTINGS_SetVfoFrequency(rndfreq);
-          //gEeprom.MrChannel     = scanChannel[randomChannel];
-		  //gEeprom.ScreenChannel = scanChannel[randomChannel];
+          rndfreq = gMR_ChannelFrequencyAttributes[scanChannel[randomChannel]].Frequency;
+          SETTINGS_SetVfoFrequency(rndfreq);
+          gEeprom.MrChannel     = scanChannel[randomChannel];
+			    gEeprom.ScreenChannel = scanChannel[randomChannel];
           gTxVfo->Modulation = MODULATION_FM;
           gTxVfo->STEP_SETTING = STEP_0_01kHz;
           gRequestSaveChannel = 1;
@@ -744,7 +740,7 @@ static void ExitAndCopyToVfo() {
               gTxVfo->STEP_SETTING = STEP_0_01kHz;
               gTxVfo->Modulation = MODULATION_FM;
               gTxVfo->OUTPUT_POWER = OUTPUT_POWER_HIGH;
-              COMMON_SwitchVFOMode();
+              COMMON_SwitchToVFOMode();
           }
           else {
             gTxVfo->freq_config_RX.Frequency = HFreqs[historyListIndex];
@@ -753,15 +749,15 @@ static void ExitAndCopyToVfo() {
             COMMON_SwitchToChannelMode();
           }
           gRequestSaveChannel = 1;
-          } */
+          }
 
       DeInitSpectrum(1);
-      //break;      
+      break;      
     
-    /* default:
+    default: */
       DeInitSpectrum(0);
-      break;
-  }*/
+    //To solve LATERbreak;
+    //}
     // Additional delay to debounce keys
     SYSTEM_DelayMs(200);
     isInitialized = false;
@@ -884,13 +880,40 @@ static void ResetScanStats() {
   scanInfo.rssiMax = scanInfo.rssiMin + 20 ; 
 }
 
+uint32_t BOARD_fetchChannelFrequency(const uint16_t Channel)
+{
+	struct
+	{
+		uint32_t frequency;
+		uint32_t offset;
+	} __attribute__((packed)) info;
+
+	EEPROM_ReadBuffer(0x0000 + Channel * 16, &info, sizeof(info));
+	if (info.frequency == 0xFFFFFFFF) return 0;
+	else return info.frequency;
+}
+
+
+void BOARD_gMR_LoadChannels() {
+	uint16_t  i;
+	uint32_t freq_buf;
+
+	for (i = MR_CHANNEL_FIRST; i <= MR_CHANNEL_LAST; i++)
+	{
+		freq_buf = BOARD_fetchChannelFrequency(i);
+
+		gMR_ChannelFrequencyAttributes[i].Frequency = RX_freq_check(freq_buf) == 0xFF ? 0 : freq_buf;
+        //char str[64] = "";sprintf(str, "LC %d \r\n",gMR_ChannelFrequencyAttributes[i].Frequency );LogUart(str);     
+	}
+}
+
 static bool InitScan() {
     ResetScanStats();
     scanInfo.i = 0;
-    
+//char str[64] = "";sprintf(str, "appMode %d\r\n",appMode);LogUart(str);     
     bool scanInitializedSuccessfully = false;
-
     if (appMode == SCAN_BAND_MODE) {
+//char str[64] = "";sprintf(str, "SCAN_BAND_MODE \r\n");LogUart(str);  
         uint8_t checkedBandCount = 0;
         while (checkedBandCount < 32) { 
             if (settings.bandEnabled[nextBandToScanIndex]) {
@@ -915,7 +938,9 @@ static bool InitScan() {
       }
     if (appMode == CHANNEL_MODE) {
       uint16_t currentChannel = scanChannel[0];
+      char str[64] = "";sprintf(str, "currentChannel %d \r\n",currentChannel);LogUart(str);  
       scanInfo.f = gMR_ChannelFrequencyAttributes[currentChannel].Frequency; 
+      sprintf(str, "scanInfo.f %d \r\n",scanInfo.f);LogUart(str);     
     }
     return scanInitializedSuccessfully;
 }
@@ -926,7 +951,6 @@ static void ResetModifiers() {
   for (int i = 0; i < 128; ++i) {
     if (rssiHistory[i] == RSSI_MAX_VALUE) rssiHistory[i] = 0;
   }
-  if(appMode==CHANNEL_MODE){LoadValidMemoryChannels();}
   RelaunchScan();
 }
 
@@ -1037,7 +1061,8 @@ static void UpdateDBMaxAuto() { //Zoom
   static uint8_t z = 10;
   int newDbMax;
     if (scanInfo.rssiMax > 0) {
-        newDbMax = clamp(Rssi2DBm(scanInfo.rssiMax), -100, 0);
+        //newDbMax = clamp(Rssi2DBm(scanInfo.rssiMax), -100, 0);
+        newDbMax = Rssi2DBm(scanInfo.rssiMax);
 
         if (newDbMax > settings.dbMax + z) {
             settings.dbMax = settings.dbMax + z;   // montée limitée
@@ -1049,7 +1074,8 @@ static void UpdateDBMaxAuto() { //Zoom
     }
 
     if (scanInfo.rssiMin > 0) {
-        settings.dbMin = clamp(Rssi2DBm(scanInfo.rssiMin), -160, -110);
+        //settings.dbMin = clamp(Rssi2DBm(scanInfo.rssiMin), -160, -110);
+        settings.dbMin = Rssi2DBm(scanInfo.rssiMin);
     }
 }
 
@@ -1458,9 +1484,8 @@ static void UpdateCssDetection(void) {
 static void DrawF(uint32_t f) {
     if ((f == 0) || f < 1400000 || f > 130000000) return;
     char freqStr[18];
-    //FormatFrequency(f, freqStr, sizeof(freqStr));
-    snprintf(freqStr, sizeof(freqStr), "%u.%05u", f / 100000, f % 100000); //последние нули
-    UpdateCssDetection(); // субтон новый
+    snprintf(freqStr, sizeof(freqStr), "%u.%05u", f / 100000, f % 100000);
+    UpdateCssDetection();
     uint16_t channelFd = BOARD_gMR_fetchChannel(f);
     isKnownChannel = (channelFd != 0xFFFF);
     char line1[19] = "";
@@ -1471,13 +1496,11 @@ static void DrawF(uint32_t f) {
     sprintf(line1, "%s", freqStr);
     sprintf(line1b, "%s %s", freqStr, StringCode);
     
-    // Обновляем имя канала раз в секунду (как было в старом коде)
     if (gNextTimeslice_1s) {
         SETTINGS_FetchChannelName(channelName,channelFd );
         gNextTimeslice_1s = 0;
     }
 
-    // line2 — имя списка/бэнда + имя канала (точно как в старом коде, но безопасно)
     char prefix[9] = "";
     if (appMode == SCAN_BAND_MODE) {
         snprintf(prefix, sizeof(prefix), "B%u ", bl + 1);
@@ -1487,26 +1510,21 @@ static void DrawF(uint32_t f) {
             snprintf(line2, sizeof(line2), "%-3s%s", prefix, BParams[bl].BandName);
         }
     } else if (appMode == CHANNEL_MODE) {
-        if (ScanListNumber[scanInfo.i] && ScanListNumber[scanInfo.i] < 16) {
+        if (ScanListNumber[scanInfo.i] && ScanListNumber[scanInfo.i] < 25) {
             snprintf(prefix, sizeof(prefix), "S%d ", ScanListNumber[scanInfo.i]);
             } else {
             snprintf(prefix, sizeof(prefix), "ALL ");
               }
-        // Показываем имя канала, если есть
         if (channelName[0] != '\0') {
             snprintf(line2, sizeof(line2), "%-3s%s ", prefix, channelName);
         } else {
-            snprintf(line2, sizeof(line2), "%-3s", prefix);  // только префикс, если нет имени
+            snprintf(line2, sizeof(line2), "%-3s", prefix);
         }
     } else {
         line2[0] = '\0';
     }
-
-    // line3 — логика ровно по твоему описанию
     line3[0] = '\0';
     int pos = 0;
-
-    // 1. Если есть MaxListenTime → показываем только его + End (если есть)
     if (MaxListenTime > 0) {
         pos += sprintf(&line3[pos], "RX%d|%s", spectrumElapsedCount / 1000, labels[IndexMaxLT]);
         
@@ -1517,9 +1535,7 @@ static void DrawF(uint32_t f) {
                 pos += sprintf(&line3[pos], "End OO");
             }
         }
-    }
-    // 2. Если MaxListenTime НЕ установлен → показываем Rx + End (если есть)
-    else {
+    } else {
         pos += sprintf(&line3[pos], "RX%d", spectrumElapsedCount / 1000);
         
         if (WaitSpectrum > 0) {
@@ -1661,14 +1677,13 @@ static void NextScanStep() {
     { 
       int currentChannel = scanChannel[scanInfo.i];
       scanInfo.f =  gMR_ChannelFrequencyAttributes[currentChannel].Frequency;
+char str[64] = "";sprintf(str, "NSS %d  %d \r\n",scanInfo.i, scanInfo.f  );LogUart(str);      
     } 
     else {
           // frequency mode
           if(scanInfo.scanStep==833) nextFrequency833();
           else scanInfo.f += scanInfo.scanStep;
     }
-    
-
 }
 
 static uint16_t CountValidHistoryItems() {
@@ -3117,7 +3132,10 @@ void APP_RunSpectrum(uint8_t Spectrum_state)
         if (!Key_1_pressed) LoadSettings(0); 
         appMode = mode;
         ResetModifiers();
-        if (appMode==CHANNEL_MODE) LoadValidMemoryChannels();
+        if(appMode==CHANNEL_MODE){LoadValidMemoryChannels();}
+        if (appMode==CHANNEL_MODE) {
+            BOARD_gMR_LoadChannels();
+        }
         if (appMode==FREQUENCY_MODE && !Key_1_pressed) {
             currentFreq = gTxVfo->pRX->Frequency;
             gScanRangeStart = currentFreq - (GetBW() >> 1);
@@ -3141,9 +3159,8 @@ void APP_RunSpectrum(uint8_t Spectrum_state)
         BK4819_WriteRegister(BK4819_REG_47, 0x6040);
         BK4819_WriteRegister(BK4819_REG_48, 0xB3A8);  // AF gain
 	    ToggleRX(true), ToggleRX(false); // hack to prevent noise when squelch off
-    RADIO_SetModulation(settings.modulationType = gTxVfo->Modulation);
-
-    BK4819_SetFilterBandwidth(settings.listenBw, false);
+        RADIO_SetModulation(settings.modulationType = gTxVfo->Modulation);
+        BK4819_SetFilterBandwidth(settings.listenBw, false);
         isListening = true;
         newScanStart = true;
         AutoAdjustFreqChangeStep();
@@ -3168,29 +3185,44 @@ void APP_RunSpectrum(uint8_t Spectrum_state)
     } 
 }
 
-uint16_t RADIO_ValidMemoryChannelsCount(bool bCheckScanList, uint8_t CurrentScanList)
+static bool RADIO_CheckChannel(uint16_t Channel, bool bCheckScanList, uint8_t scanList)
+{	// return true if the channel appears valid
+	const ChannelAttributes_t* att = MR_GetChannelAttributes(Channel);
+	if (!IS_MR_CHANNEL(Channel)) return false;
+	if (att->band > BAND7_470MHz) return false;
+	if (bCheckScanList) {
+		if (att->scanlist == scanList + 1)
+			return true;
+		else
+			return false;
+	}
+	return true;
+}
+
+static uint16_t RADIO_ValidMemoryChannelsCount(bool bCheckScanList, uint8_t CurrentScanList)
 {
 	uint16_t count=0;
 	for (uint16_t i = MR_CHANNEL_FIRST; i<=MR_CHANNEL_LAST; ++i) {
-			if(RADIO_CheckValidChannel(i, bCheckScanList, CurrentScanList)) count++;
+			if(RADIO_CheckChannel(i, bCheckScanList, CurrentScanList)) count++;
+//char str[64] = "";sprintf(str, "RVMCC %d %d %d \r\n",i, CurrentScanList,count);LogUart(str);
 		}
 	return count;
 }
 
 static void LoadValidMemoryChannels(void)
-  {
+{
     memset(scanChannel,0,sizeof(scanChannel));
     scanChannelsCount = 0;
     bool listsEnabled = false;
     
     // loop through all scanlists
-    for (int CurrentScanList=1; CurrentScanList <= 25; CurrentScanList++) {
+    for (int CurrentScanList=0; CurrentScanList < 25; CurrentScanList++) {
       // skip disabled scanlist
-      if (CurrentScanList <= 24 && !settings.scanListEnabled[CurrentScanList-1])
+      if (CurrentScanList < 24 && !settings.scanListEnabled[CurrentScanList])
         continue;
 
       // valid scanlist is enabled
-      if (CurrentScanList <= 24 && settings.scanListEnabled[CurrentScanList-1])
+      if (CurrentScanList <= 24 && settings.scanListEnabled[CurrentScanList])
         listsEnabled = true;
       
       // break if some lists were enabled, else scan all channels
@@ -3198,27 +3230,32 @@ static void LoadValidMemoryChannels(void)
         break;
 
       uint16_t offset = scanChannelsCount;
-      uint16_t listChannelsCount = RADIO_ValidMemoryChannelsCount(listsEnabled, CurrentScanList-1);
+      uint16_t listChannelsCount = RADIO_ValidMemoryChannelsCount(listsEnabled, CurrentScanList);
       scanChannelsCount += listChannelsCount;
       int16_t channelIndex= -1;
       for(uint16_t i=0; i < listChannelsCount; i++)
       {
         uint16_t nextChannel;
-        nextChannel = RADIO_FindNextChannel(channelIndex+1, 1, listsEnabled, CurrentScanList-1);
+        nextChannel = RADIO_FindNextChannel(channelIndex+1, 1, listsEnabled, CurrentScanList);
         
-        if (nextChannel == 0xFFFF) {break;}
-        else
-        {
+        if (nextChannel == 0xFFFF) {
+            char str[64] = "";sprintf(str, "break \r\n");LogUart(str);
+            break;
+        } else {
           channelIndex = nextChannel;
           scanChannel[offset+i]=channelIndex;
-          //char str[64] = "";sprintf(str, "%d %d %d %d \r\n", scanChannelsCount,offset,i,channelIndex);LogUart(str);
+          char str[64] = "";sprintf(str, "%d %d %d \r\n",i,CurrentScanList,channelIndex);LogUart(str);
 		
           ScanListNumber[offset+i]=CurrentScanList;
       
         }
       }
     }
-  }
+for (int i=0; i<100; i++) {
+char str[64] = "";sprintf(str, "%d %d \r\n",i,ScanListNumber[i]);LogUart(str);
+}
+}
+
 
 static void ToggleScanList(int scanListNumber, int single )
   {
@@ -3246,7 +3283,6 @@ bool IsVersionMatching(void) {
 
 
 typedef struct {
-    // Block 1 (0x1D10 - 0x1D1F) 240 bytes max
     int ShowLines;
     uint8_t DelayRssi;
     uint8_t PttEmission; 
@@ -3281,7 +3317,7 @@ typedef struct {
 void LoadSettings(bool LNA)
 {
   SettingsEEPROM  eepromData  = {0};
-  EEPROM_ReadBuffer(0x1D10, &eepromData, sizeof(eepromData));
+  EEPROM_ReadBuffer(0xC000, &eepromData, sizeof(eepromData));
   
   BK4819_WriteRegister(BK4819_REG_10, eepromData.R10);
   BK4819_WriteRegister(BK4819_REG_11, eepromData.R11);
@@ -3320,11 +3356,18 @@ void LoadSettings(bool LNA)
   UOO_trigger = eepromData.UOO_trigger;
   osdPopupSetting = eepromData.osdPopupSetting;
   Backlight_On_Rx = eepromData.Backlight_On_Rx;
-  ChannelAttributes_t att;
-  for (int i = 0; i < MR_CHANNEL_LAST+1; i++) {
-    //To solve LATER att = gMR_ChannelAttributes[i];
-    if (att.scanlist > validScanListCount) {validScanListCount = att.scanlist;}
+  for (int i = 0; i <= MR_CHANNEL_LAST; i++) {
+    if (gMR_ChannelFrequencyAttributes[i].Frequency != 0 && gMR_ChannelFrequencyAttributes[i].Frequency != 0xFFFFFFFF) {
+        const ChannelAttributes_t* att = MR_GetChannelAttributes(i);
+        if (att != NULL) {
+            if (att->scanlist > validScanListCount) {
+                validScanListCount = att->scanlist;
+            }
+        }
+    }
+     
   }
+  
   BK4819_WriteRegister(BK4819_REG_40, eepromData.R40);
   BK4819_WriteRegister(BK4819_REG_29, eepromData.R29);
   BK4819_WriteRegister(BK4819_REG_19, eepromData.R19);
@@ -3333,13 +3376,14 @@ void LoadSettings(bool LNA)
   BK4819_WriteRegister(BK4819_REG_43, eepromData.R43);
   BK4819_WriteRegister(BK4819_REG_2B, eepromData.R2B);
   
-  
-#ifdef ENABLE_EEPROM_512K
+char str[64] = "";sprintf(str, "LoadSettings \r\n");LogUart(str);   
+//To solve LATER
+/* #ifdef ENABLE_EEPROM_512K
   if (!historyLoaded) {
      ReadHistory();
      historyLoaded = true;
   }
-#endif
+#endif */
 }
 
 static void SaveSettings() 
@@ -3393,7 +3437,7 @@ static void SaveSettings()
   
   // Write in 8-byte chunks
   for (uint16_t addr = 0; addr < sizeof(eepromData); addr += 8) 
-    EEPROM_WriteBuffer(addr + 0x1D10, ((uint8_t*)&eepromData) + addr);
+    EEPROM_WriteBuffer(addr + 0xC000, ((uint8_t*)&eepromData) + addr);
   
   ShowOSDPopup("PARAMS SAVED");
 }
@@ -3452,17 +3496,17 @@ void ClearSettings()
   BK4819_WriteRegister(BK4819_REG_2B, 49152); */
   
   ShowOSDPopup("DEFAULT SETTINGS");
-  SaveSettings();
+  //To solve LATER SaveSettings();
 }
 
 
 
 
 static bool GetScanListLabel(uint8_t scanListIndex, char* bufferOut) {
-    ChannelAttributes_t att;
+    //To solve LATER ChannelAttributes_t att;
     char channel_name[12];
     uint16_t first_channel = 0xFFFF;
-    uint16_t channel_count = 0;
+    //To solve LATER uint16_t channel_count = 0;
 
     for (uint16_t i = 0; i < MR_CHANNEL_LAST+1; i++) {
         //To solve LATER att = gMR_ChannelAttributes[i];

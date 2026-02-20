@@ -1015,9 +1015,9 @@ def list_def(value, lst, default):
 
 @directory.register
 class UVK5RadioEgzumer(chirp_common.CloneModeRadio):
-    """Quansheng UV-K5 (egzumer + f4hwn)"""
+    """Quansheng UV-K5"""
     VENDOR = "Quansheng"
-    MODEL = "UV-K1 & UV-K5 V3 (F4HWN Fusion)"
+    MODEL = "UV-K1 & UV-K5 V3"
     BAUD_RATE = 38400
     NEEDS_COMPAT_SERIAL = False
     FIRMWARE_VERSION = ""
