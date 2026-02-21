@@ -163,7 +163,7 @@ enum
     MENU_BATTYP
 };
 
-extern const uint8_t FIRST_HIDDEN_MENU_ITEM;
+//extern const uint8_t FIRST_HIDDEN_MENU_ITEM;
 extern const t_menu_item MenuList[];
 
 extern const char        gSubMenu_TXP[8][6];

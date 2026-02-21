@@ -190,7 +190,7 @@ const t_menu_item MenuList[] =
     {"",                              0xff               }  // end of list - DO NOT delete or move this this
 };
 
-const uint8_t FIRST_HIDDEN_MENU_ITEM = MENU_F_LOCK;
+//const uint8_t FIRST_HIDDEN_MENU_ITEM = MENU_F_LOCK;
 
 const char gSubMenu_TXP[][6] =
 {

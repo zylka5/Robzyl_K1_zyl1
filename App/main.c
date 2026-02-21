@@ -169,8 +169,7 @@ void Main(void)
     // count the number of menu items
     gMenuListCount = 0;
     while (MenuList[gMenuListCount].name[0] != '\0') {
-        if(!gF_LOCK && MenuList[gMenuListCount].menu_id == FIRST_HIDDEN_MENU_ITEM)
-            break;
+        //if(!gF_LOCK && MenuList[gMenuListCount].menu_id == FIRST_HIDDEN_MENU_ITEM) break;
 
         gMenuListCount++;
     }

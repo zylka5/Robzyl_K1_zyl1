@@ -1,4 +1,5 @@
 #include "app/spectrum.h"
+#include "driver/py25q16.h"
 #include "audio.h"
 #include "scanner.h"
 #include "driver/backlight.h"
@@ -25,12 +26,12 @@
 static volatile bool gSpectrumChangeRequested = false;
 static volatile uint8_t gRequestedSpectrumState = 0;
 
-#ifdef ENABLE_EEPROM_512K
-  #define HISTORY_SIZE 100
-#else
-  #define HISTORY_SIZE 500
-#endif
+#define HISTORY_SIZE 50
 
+#define ADRESS_STATE 0xC000
+#define ADRESS_VERSION 0xC008
+#define ADRESS_PARAMS 0xC010
+#define ADRESS_HISTORY 0xD000
 
 static uint16_t historyListIndex = 0;
 static uint16_t indexFs = 0;
@@ -498,15 +499,15 @@ static void DeInitSpectrum(bool ComeBack) {
   SetState(SPECTRUM);
   if(!ComeBack) {
     uint8_t Spectrum_state = 0; //Spectrum Not Active
-    EEPROM_WriteBuffer(0xD000, &Spectrum_state);
+    PY25Q16_WriteBuffer(ADRESS_STATE, &Spectrum_state,1,1);
     ToggleRX(0);
     SYSTEM_DelayMs(50);
     }
     
   else {
-    EEPROM_ReadBuffer(0xD000, &Spectrum_state, 1);
+    PY25Q16_ReadBuffer(ADRESS_STATE, &Spectrum_state, 1);
 	Spectrum_state+=10;
-    EEPROM_WriteBuffer(0xD000, &Spectrum_state);
+    PY25Q16_WriteBuffer(ADRESS_STATE, &Spectrum_state,1,1);
     //StorePtt_Toggle_Mode = Ptt_Toggle_Mode;To solve LATER
     SYSTEM_DelayMs(50);
     //Ptt_Toggle_Mode =0; //To solve LATER
@@ -585,7 +586,7 @@ static void SaveHistoryToFreeChannel(void) {
     for (int i = 0; i < MR_CHANNEL_LAST; i++) {
         uint32_t freqInMem;
         // Lecture des 4 premiers octets du canal (la fréquence)
-        EEPROM_ReadBuffer(0x0000 + (i * 16), (uint8_t *)&freqInMem, 4);
+        PY25Q16_ReadBuffer(0x0000 + (i * 16), (uint8_t *)&freqInMem, 4);
         
         // Si le canal n'est pas vide (0xFFFFFFFF) et que la fréquence correspond
         if (freqInMem != 0xFFFFFFFF && freqInMem == f) {
@@ -601,7 +602,7 @@ static void SaveHistoryToFreeChannel(void) {
     for (int i = 0; i < MR_CHANNEL_LAST; i++) {
         uint8_t checkByte;
         // On vérifie juste le premier octet pour voir si le slot est libre
-        EEPROM_ReadBuffer(0x0000 + (i * 16), &checkByte, 1);
+        PY25Q16_ReadBuffer(0x0000 + (i * 16), &checkByte, 1);
         if (checkByte == 0xFF) { 
             freeCh = i;
             break;
@@ -644,13 +645,12 @@ typedef struct HistoryStruct {
 } HistoryStruct;
 
 
-#ifdef ENABLE_EEPROM_512K
 static bool historyLoaded = false; // flaga stanu wczytania histotii spectrum
 
 void ReadHistory(void) {
     HistoryStruct History = {0};
     for (uint16_t position = 0; position < HISTORY_SIZE; position++) {
-        EEPROM_ReadBuffer(ADRESS_HISTORY + position * sizeof(HistoryStruct),
+        PY25Q16_ReadBuffer(ADRESS_HISTORY + position * sizeof(HistoryStruct),
                           (uint8_t *)&History, sizeof(HistoryStruct));
 
         // Stop si marque de fin trouvée
@@ -676,21 +676,16 @@ void WriteHistory(void) {
         History.HFreqs = HFreqs[position];
         History.HCount = HCount[position];
         History.HBlacklisted = HBlacklisted[position];
-        EEPROM_WriteBuffer(ADRESS_HISTORY + position * sizeof(HistoryStruct),
-                           (uint8_t *)&History);
+        PY25Q16_WriteBuffer(ADRESS_HISTORY + position * sizeof(HistoryStruct),(uint8_t *)&History,sizeof(History),1);
     }
 
     // Marque de fin (HBlacklisted = 0xFF)
     History.HFreqs = 0;
     History.HCount = 0;
     History.HBlacklisted = 0xFF;
-    EEPROM_WriteBuffer(ADRESS_HISTORY + indexFs * sizeof(HistoryStruct),
-                       (uint8_t *)&History);
-    
+    PY25Q16_WriteBuffer(ADRESS_HISTORY + indexFs * sizeof(HistoryStruct),(uint8_t *)&History,sizeof(History),1);
     ShowOSDPopup("HISTORY SAVED");
 }
-
-#endif
 
 uint16_t BOARD_gMR_fetchChannel(const uint32_t freq)
 {
@@ -892,7 +887,7 @@ static uint32_t GetMrChannelFreq(uint16_t ch)
     if (!IS_MR_CHANNEL(ch))
         return 0;
 
-    EEPROM_ReadBuffer(0x0000 + (ch * 16), (uint8_t *)&freq, 4);
+    PY25Q16_ReadBuffer(0x0000 + (ch * 16), (uint8_t *)&freq, 4);
 
     if (freq == 0xFFFFFFFF || freq < 1400000 || freq > 130000000)
         return 0;
@@ -1057,7 +1052,7 @@ static void UpdateDBMaxAuto() { //Zoom
   static uint8_t z = 10;
   int newDbMax;
     if (scanInfo.rssiMax > 0) {
-        newDbMax = clamp(Rssi2DBm(scanInfo.rssiMax), -100, 0);
+        newDbMax = Rssi2DBm(scanInfo.rssiMax);
 
         if (newDbMax > settings.dbMax + z) {
             settings.dbMax = settings.dbMax + z;   // montée limitée
@@ -1069,7 +1064,7 @@ static void UpdateDBMaxAuto() { //Zoom
     }
 
     if (scanInfo.rssiMin > 0) {
-        settings.dbMin = clamp(Rssi2DBm(scanInfo.rssiMin), -160, -110);
+        settings.dbMin = Rssi2DBm(scanInfo.rssiMin);
     }
 }
 
@@ -1620,7 +1615,7 @@ static void LookupChannelModulation() {
 	  uint8_t tmp;
 		uint8_t data[8];
 
-		EEPROM_ReadBuffer(0x0000 + gChannel * 16 + 8, data, sizeof(data));
+		PY25Q16_ReadBuffer(0x0000 + gChannel * 16 + 8, data, sizeof(data));
 
 		tmp = data[3] >> 4;
 		if (tmp >= MODULATION_UKNOWN)
@@ -2170,11 +2165,7 @@ static void OnKeyDown(uint8_t key) {
      
      case KEY_7:
 
-        if (historyListActive) {
-        #ifdef ENABLE_EEPROM_512K
-          WriteHistory();
-        #endif
-        }
+        if (historyListActive) {WriteHistory();}
         else {
           SaveSettings(); 
         }
@@ -3145,7 +3136,7 @@ void APP_RunSpectrum(uint8_t Spectrum_state)
         else if (Spectrum_state == 1) mode = CHANNEL_MODE ;
         else mode = FREQUENCY_MODE;
         //BK4819_SetFilterBandwidth(BK4819_FILTER_BW_NARROW, false);  // принудительно узкий в спектре ЧИНИМ ВФО
-        EEPROM_WriteBuffer(0x1D00, &Spectrum_state);
+        PY25Q16_WriteBuffer(ADRESS_STATE, &Spectrum_state,1,1);
         if (!Key_1_pressed) LoadSettings(0); 
         appMode = mode;
         ResetModifiers();
@@ -3173,9 +3164,8 @@ void APP_RunSpectrum(uint8_t Spectrum_state)
         BK4819_WriteRegister(BK4819_REG_47, 0x6040);
         BK4819_WriteRegister(BK4819_REG_48, 0xB3A8);  // AF gain
 	    ToggleRX(true), ToggleRX(false); // hack to prevent noise when squelch off
-    RADIO_SetModulation(settings.modulationType = gTxVfo->Modulation);
-
-    BK4819_SetFilterBandwidth(settings.listenBw, false);
+        RADIO_SetModulation(settings.modulationType = gTxVfo->Modulation);
+        BK4819_SetFilterBandwidth(settings.listenBw, false);
         isListening = true;
         newScanStart = true;
         AutoAdjustFreqChangeStep();
@@ -3292,8 +3282,8 @@ static void ToggleScanList(int scanListNumber, int single )
 bool IsVersionMatching(void) {
     uint16_t stored,app_version;
     app_version = APP_VERSION;
-    EEPROM_ReadBuffer(0x1D08, &stored, 2);
-    if (stored != APP_VERSION) EEPROM_WriteBuffer(0x1D08, &app_version);
+    PY25Q16_ReadBuffer(ADRESS_VERSION, &stored, 2);
+    if (stored != APP_VERSION) PY25Q16_WriteBuffer(ADRESS_VERSION, &app_version,sizeof(app_version),1);
     return (stored == APP_VERSION);
 }
 
@@ -3334,7 +3324,7 @@ typedef struct {
 void LoadSettings(bool LNA)
 {
   SettingsEEPROM  eepromData  = {0};
-  EEPROM_ReadBuffer(0x1D10, &eepromData, sizeof(eepromData));
+  PY25Q16_ReadBuffer(ADRESS_PARAMS, &eepromData, sizeof(eepromData));
   
   BK4819_WriteRegister(BK4819_REG_10, eepromData.R10);
   BK4819_WriteRegister(BK4819_REG_11, eepromData.R11);
@@ -3387,12 +3377,10 @@ void LoadSettings(bool LNA)
   BK4819_WriteRegister(BK4819_REG_2B, eepromData.R2B);
   
   
-#ifdef ENABLE_EEPROM_512K
-  if (!historyLoaded) {
+/*  if (!historyLoaded) {
      ReadHistory();
      historyLoaded = true;
-  }
-#endif
+  } */
 }
 
 static void SaveSettings() 
@@ -3445,8 +3433,8 @@ static void SaveSettings()
 
   
   // Write in 8-byte chunks
-  for (uint16_t addr = 0; addr < sizeof(eepromData); addr += 8) 
-    EEPROM_WriteBuffer(addr + 0xC000, ((uint8_t*)&eepromData) + addr);
+  //for (uint16_t addr = 0; addr < sizeof(eepromData); addr += 8) 
+    PY25Q16_WriteBuffer(ADRESS_PARAMS, ((uint8_t*)&eepromData), sizeof(eepromData),1);
   
   ShowOSDPopup("PARAMS SAVED");
 }
@@ -3458,10 +3446,8 @@ static void ClearHistory()
   memset(HBlacklisted,0,sizeof(HBlacklisted));
   historyListIndex = 0;
   historyScrollOffset = 0;
-  #ifdef ENABLE_EEPROM_512K
   indexFs = HISTORY_SIZE;
   WriteHistory();
-  #endif
   indexFs = 0;
   SaveSettings(); 
 }
@@ -3534,7 +3520,7 @@ static bool GetScanListLabel(uint8_t scanListIndex, char* bufferOut) {
 
     if (channel_name[0] == '\0') {
         uint32_t freq = 0xFFFFFFFF;
-        EEPROM_ReadBuffer(0x0000 + (first_channel * 16), (uint8_t *)&freq, 4);
+        PY25Q16_ReadBuffer(0x0000 + (first_channel * 16), (uint8_t *)&freq, 4);
 
         if (freq == 0xFFFFFFFF || freq < 1400000) {
             // jeżeli slot pusty lub uszkodzony, to nie pokazuj tej listy jako "valid"

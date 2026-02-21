@@ -248,7 +248,7 @@ static void SendReply(uint32_t Port, void *pReply, uint16_t Size)
         return;
     }
 #endif
-
+#if defined(ENABLE_UART)
     Header_t Header;
     Footer_t Footer;
 
@@ -279,6 +279,7 @@ static void SendReply(uint32_t Port, void *pReply, uint16_t Size)
     Footer.ID = 0xBADC;
 
     UART_Send(&Footer, sizeof(Footer));
+#endif
 }
 
 static void SendVersion(uint32_t Port)
@@ -401,7 +402,7 @@ static void CMD_051B(uint32_t Port, const uint8_t *pBuffer)
 
     if (!bLocked)
     {
-        EEPROM_ReadBuffer(pCmd->Offset, Reply.Data.Data, pCmd->Size);
+        PY25Q16_ReadBuffer(pCmd->Offset, Reply.Data.Data, pCmd->Size);
     }
     
     SendReply(Port, &Reply, pCmd->Size + 8);
