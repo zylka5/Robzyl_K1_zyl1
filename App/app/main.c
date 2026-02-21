@@ -233,7 +233,7 @@ static void processFKeyFunction(const KEY_Code_t Key, const bool beep)
                 gRequestSaveVFO   = true;
                 gVfoConfigureMode = VFO_CONFIGURE_RELOAD;
 #elif defined(ENABLE_SPECTRUM)
-                APP_RunSpectrum(1);
+                APP_RunSpectrum(2);
                 gRequestDisplayScreen = DISPLAY_MAIN;
 #endif
             }
