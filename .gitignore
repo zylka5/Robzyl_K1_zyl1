@@ -14,3 +14,5 @@ k5_eeprom.raw
 /serialtool/__pycache__
 
 .DS_Store
+*.img
+K1_prog_win/my_config.bin
