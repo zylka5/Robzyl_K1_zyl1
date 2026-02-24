@@ -9,6 +9,7 @@
 #include "action.h"
 #include "bands.h"
 #include "ui/main.h"
+#include "driver/py25q16.h"
 //#include "debugging.h"
 
 /*	
@@ -486,8 +487,9 @@ static uint32_t GetScanStep() { return scanStepValues[settings.scanStepIndex]; }
 
 static uint16_t GetStepsCount() 
 { 
-if (appMode==CHANNEL_MODE) 
-{
+if (appMode==CHANNEL_MODE) {
+    if (scanChannelsCount == 0)
+        return 0;
     return scanChannelsCount - 1;
 }
   if(appMode==SCAN_RANGE_MODE) {
@@ -663,7 +665,7 @@ typedef struct HistoryStruct {
 } HistoryStruct;
 
 
-static bool historyLoaded = false; // flaga stanu wczytania histotii spectrum
+/* static bool historyLoaded = false; // flaga stanu wczytania histotii spectrum
 
 void ReadHistory(void) {
     HistoryStruct History = {0};
@@ -706,7 +708,7 @@ void WriteHistory(void) {
                        (uint8_t *)&History);
     
     ShowOSDPopup("HISTORY SAVED");
-}
+} */
 
 uint16_t BOARD_gMR_fetchChannel(const uint32_t freq)
 {
@@ -1726,11 +1728,16 @@ static uint16_t CountValidHistoryItems() {
 }
 
 static void Skip() {
-    WaitSpectrum = 0;
-    spectrumElapsedCount = 0;
-    gIsPeak = false;
-    ToggleRX(false);
-    NextScanStep();
+  if (!SpectrumMonitor) {  
+      WaitSpectrum = 0;
+      spectrumElapsedCount = 0;
+      gIsPeak = false;
+      ToggleRX(false);
+      NextScanStep();
+      peak.f = scanInfo.f;
+      peak.i = scanInfo.i;
+      SetF(scanInfo.f);
+  }
 }
 
 static void SetTrigger50(){
@@ -2179,10 +2186,10 @@ static void OnKeyDown(uint8_t key) {
      
      case KEY_7:
 
-        if (historyListActive) {WriteHistory();}
-        else {
+        //if (historyListActive) {WriteHistory();}
+        //else {
           SaveSettings(); 
-        }
+        //}
         break;
      
      case KEY_2:
@@ -2472,7 +2479,8 @@ static void OnKeyDownStill(KEY_Code_t key) {
           if (stillEditRegs) {
             SetRegMenuValue(stillRegSelected, true);
           } else if (SpectrumMonitor > 0) {
-                    uint32_t step = GetScanStep();
+             uint32_t step = GetScanStep() ;/// 10;
+             if (step < 1) step = 1;
                     peak.f += step;
                     scanInfo.f = peak.f;
                     SetF(peak.f);
@@ -2483,6 +2491,7 @@ static void OnKeyDownStill(KEY_Code_t key) {
             SetRegMenuValue(stillRegSelected, false);
           } else if (SpectrumMonitor > 0) {
              uint32_t step = GetScanStep();// / 10;
+             if (step < 1) step = 1;
              if (peak.f > step) peak.f -= step;
              scanInfo.f = peak.f;
              SetF(peak.f);
@@ -3284,63 +3293,35 @@ static void LoadValidMemoryChannels(void)
 {
     memset(scanChannel, 0, sizeof(scanChannel));
     memset(ScanListNumber, 0, sizeof(ScanListNumber));
-
     scanChannelsCount = 0;
     bool listsEnabled = false;
-
-    // loop through all scanlists
-    // CurrentScanList: 1..24 = listy użytkownika, 25 = ALL (fallback)
-    for (int CurrentScanList = 1; CurrentScanList <= 25; CurrentScanList++)
+    for (int CurrentScanList = 1; CurrentScanList < 25; CurrentScanList++)
     {
-        // skip disabled scanlist (1..24)
         if (CurrentScanList <= 24 && !settings.scanListEnabled[CurrentScanList - 1])
             continue;
-
-        // at least one valid scanlist is enabled
         if (CurrentScanList <= 24 && settings.scanListEnabled[CurrentScanList - 1])
             listsEnabled = true;
-
-        // if at least one list is enabled, do not add ALL fallback
         if (CurrentScanList > 24 && listsEnabled)
             break;
-
-        // IMPORTANT:
-        // radio.c expects "real" scan list numbers:
-        //   0  -> special meaning (often "no list"/invalid)
-        //   1..24 -> scan lists
-        //   25 -> ALL (MR_CHANNELS_LIST + 1)
-        //
-        // Our CurrentScanList already matches 1..24.
-        // For fallback (CurrentScanList == 25) we pass 25 (ALL).
         const uint8_t listId =
             (CurrentScanList <= 24) ? (uint8_t)CurrentScanList : (uint8_t)(MR_CHANNELS_LIST + 1);
 
         uint16_t offset = scanChannelsCount;
-
         uint16_t listChannelsCount = RADIO_ValidMemoryChannelsCount(listsEnabled, listId);
         scanChannelsCount += listChannelsCount;
-
         int16_t channelIndex = -1;
-
         for (uint16_t i = 0; i < listChannelsCount; i++)
         {
             uint16_t nextChannel = RADIO_FindNextChannel(channelIndex + 1, 1, listsEnabled, listId);
-
-            if (nextChannel == 0xFFFF)
-                break;
-
+            if (nextChannel == 0xFFFF) break;
             channelIndex = nextChannel;
             scanChannel[offset + i] = channelIndex;
-
-            // keep for display/debug (1..24 or 25 for ALL)
             ScanListNumber[offset + i] = (uint8_t)CurrentScanList;
         }
-    }
-	    // --- DEBUG: pokaż ile kanałów wczytano do skanowania ---
-    {
-        char msg[32];
-        snprintf(msg, sizeof(msg), "SL CH:%u", (unsigned)scanChannelsCount);
-        ShowOSDPopup(msg);
+    
+/*     char msg[32];
+    snprintf(msg, sizeof(msg), "%d", CurrentScanList);
+    ShowOSDPopup(msg); */
     }
 }
 
@@ -3360,13 +3341,13 @@ static void ToggleScanList(int scanListNumber, int single )
 
 #include "index.h"
 
-bool IsVersionMatching(void) {
+/* bool IsVersionMatching(void) {
     uint16_t stored,app_version;
     app_version = APP_VERSION;
     EEPROM_ReadBuffer(ADRESS_VERSION, &stored, 2);
     if (stored != APP_VERSION) EEPROM_WriteBuffer(ADRESS_VERSION, &app_version);
     return (stored == APP_VERSION);
-}
+} */
 
 
 typedef struct {
@@ -3409,7 +3390,7 @@ void LoadSettings(bool LNA)
 {
   if(SettingsLoaded) return;
   SettingsEEPROM  eepromData  = {0};
-  EEPROM_ReadBuffer(ADRESS_PARAMS, &eepromData, sizeof(eepromData));
+  PY25Q16_ReadBuffer(ADRESS_PARAMS, &eepromData, sizeof(eepromData));
   
   BK4819_WriteRegister(BK4819_REG_10, eepromData.R10);
   BK4819_WriteRegister(BK4819_REG_11, eepromData.R11);
@@ -3417,7 +3398,7 @@ void LoadSettings(bool LNA)
   BK4819_WriteRegister(BK4819_REG_13, eepromData.R13);
   BK4819_WriteRegister(BK4819_REG_14, eepromData.R14);
   if (LNA) return;
-  if(!IsVersionMatching()) ClearSettings();
+  //To solve LATER if(!IsVersionMatching()) ClearSettings();
   for (int i = 0; i < 24; i++) {
     settings.scanListEnabled[i] = (eepromData.scanListFlags >> i) & 0x01;
   }
@@ -3465,10 +3446,10 @@ void LoadSettings(bool LNA)
   BK4819_WriteRegister(BK4819_REG_2B, eepromData.R2B);
   
   
-  if (!historyLoaded) {
+/*   if (!historyLoaded) {
      //To solve LATER ReadHistory();
      historyLoaded = true;
-  }
+  } */
 SettingsLoaded = true;
 }
 
@@ -3524,9 +3505,7 @@ static void SaveSettings()
   sprintf(str, "R2B %d \r\n", eepromData.R2B);LogUart(str); //R2B 49152 */
 
   
-  // Write in 8-byte chunks
-  for (uint16_t addr = 0; addr < sizeof(eepromData); addr += 8) 
-    EEPROM_WriteBuffer(ADRESS_PARAMS, ((uint8_t*)&eepromData) + addr);
+  PY25Q16_WriteBuffer(ADRESS_PARAMS, ((uint8_t*)&eepromData),sizeof(eepromData),0);
   
   ShowOSDPopup("PARAMS SAVED");
 }
@@ -3539,7 +3518,7 @@ static void ClearHistory()
   historyListIndex = 0;
   historyScrollOffset = 0;
   indexFs = HISTORY_SIZE;
-  WriteHistory();
+  //To solve LATER WriteHistory();
   indexFs = 0;
   SaveSettings(); 
 }

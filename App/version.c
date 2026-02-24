@@ -9,7 +9,7 @@
     const char Version[]      = AUTHOR_STRING_2 " " VERSION_STRING_2;
     const char Edition[]      = EDITION_STRING;
 #else
-    const char Version[]      = AUTHOR_STRING VER;
+    const char Version[]      = AUTHOR_STRING VER APP_VERSION;
 #endif
 
 const char UART_Version[] = "UV-K5 Firmware, " AUTHOR_STRING VER "\r\n";
