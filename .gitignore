@@ -16,3 +16,5 @@ k5_eeprom.raw
 .DS_Store
 *.img
 K1_prog_win/my_config.bin
+chirp/Quansheng_UV-K1 & UV-K5 V3_20260221.img
+/K1_prog_win

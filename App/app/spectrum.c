@@ -28,15 +28,13 @@ static volatile uint8_t gRequestedSpectrumState = 0;
 
 #define HISTORY_SIZE 50
 
-/* #define ADRESS_STATE 0xC000
-#define ADRESS_VERSION 0xC008
-#define ADRESS_PARAMS 0xC010
-#define ADRESS_HISTORY 0xD000 */
-
 #define ADRESS_STATE   0x9100
 #define ADRESS_VERSION 0x9108
 #define ADRESS_PARAMS  0x9110
 #define ADRESS_HISTORY 0x9300
+
+#define NoisLvl 60
+#define NoiseHysteresis 15
 
 static uint16_t historyListIndex = 0;
 static uint16_t indexFs = 0;
@@ -64,8 +62,8 @@ static bool gCounthistory = 1;               // case 11
 //ClearHistory                               // case 12      
 //RAM                                        // case 13     
 static uint16_t SpectrumSleepMs = 0;         // case 14
-static uint8_t Noislvl_OFF = 60;             // case 15
-static uint8_t Noislvl_ON = 50;
+static uint8_t Noislvl_OFF = NoisLvl;             // case 15
+static uint8_t Noislvl_ON = NoisLvl - NoiseHysteresis;
 static uint16_t osdPopupSetting = 500;       // case 16
 static uint16_t UOO_trigger = 15;            // case 17
 static uint8_t AUTO_KEYLOCK = AUTOLOCK_OFF;  // case 18
@@ -519,15 +517,15 @@ static void DeInitSpectrum(bool ComeBack) {
   SetState(SPECTRUM);
   if(!ComeBack) {
     uint8_t Spectrum_state = 0; //Spectrum Not Active
-    EEPROM_WriteBuffer(ADRESS_STATE, &Spectrum_state);
+    PY25Q16_WriteBuffer(ADRESS_STATE, &Spectrum_state, 1, 0);
     ToggleRX(0);
     SYSTEM_DelayMs(50);
     }
     
   else {
-    EEPROM_ReadBuffer(ADRESS_STATE, &Spectrum_state, 1);
+    PY25Q16_ReadBuffer(ADRESS_STATE, &Spectrum_state, 1);
 	Spectrum_state+=10;
-    EEPROM_WriteBuffer(ADRESS_STATE, &Spectrum_state);
+    PY25Q16_WriteBuffer(ADRESS_STATE, &Spectrum_state, 1, 0);
     //StorePtt_Toggle_Mode = Ptt_Toggle_Mode;
     SYSTEM_DelayMs(50);
     //Ptt_Toggle_Mode =0; //To solve LATER
@@ -606,7 +604,7 @@ static void SaveHistoryToFreeChannel(void) {
     for (int i = 0; i < MR_CHANNEL_LAST; i++) {
         uint32_t freqInMem;
         // Lecture des 4 premiers octets du canal (la fréquence)
-        EEPROM_ReadBuffer(0x0000 + (i * 16), (uint8_t *)&freqInMem, 4);
+        PY25Q16_ReadBuffer(0x0000 + (i * 16), (uint8_t *)&freqInMem, 4);
         
         // Si le canal n'est pas vide (0xFFFFFFFF) et que la fréquence correspond
         if (freqInMem != 0xFFFFFFFF && freqInMem == f) {
@@ -622,7 +620,7 @@ static void SaveHistoryToFreeChannel(void) {
     for (int i = 0; i < MR_CHANNEL_LAST; i++) {
         uint8_t checkByte;
         // On vérifie juste le premier octet pour voir si le slot est libre
-        EEPROM_ReadBuffer(0x0000 + (i * 16), &checkByte, 1);
+        PY25Q16_ReadBuffer(0x0000 + (i * 16), &checkByte, 1);
         if (checkByte == 0xFF) { 
             freeCh = i;
             break;
@@ -670,7 +668,7 @@ typedef struct HistoryStruct {
 void ReadHistory(void) {
     HistoryStruct History = {0};
     for (uint16_t position = 0; position < HISTORY_SIZE; position++) {
-        EEPROM_ReadBuffer(ADRESS_HISTORY + position * sizeof(HistoryStruct),
+        PY25Q16_ReadBuffer(ADRESS_HISTORY + position * sizeof(HistoryStruct),
                           (uint8_t *)&History, sizeof(HistoryStruct));
 
         // Stop si marque de fin trouvée
@@ -696,16 +694,16 @@ void WriteHistory(void) {
         History.HFreqs = HFreqs[position];
         History.HCount = HCount[position];
         History.HBlacklisted = HBlacklisted[position];
-        EEPROM_WriteBuffer(ADRESS_HISTORY + position * sizeof(HistoryStruct),
-                           (uint8_t *)&History);
+        PY25Q16_WriteBuffer(ADRESS_HISTORY + position * sizeof(HistoryStruct),
+                           (uint8_t *)&History, sizeof(HistoryStruct), 0);
     }
 
     // Marque de fin (HBlacklisted = 0xFF)
     History.HFreqs = 0;
     History.HCount = 0;
     History.HBlacklisted = 0xFF;
-    EEPROM_WriteBuffer(ADRESS_HISTORY + indexFs * sizeof(HistoryStruct),
-                       (uint8_t *)&History);
+    PY25Q16_WriteBuffer(ADRESS_HISTORY + indexFs * sizeof(HistoryStruct),
+                       (uint8_t *)&History, sizeof(HistoryStruct), 0);
     
     ShowOSDPopup("HISTORY SAVED");
 } */
@@ -910,7 +908,7 @@ static uint32_t GetMrChannelFreq(uint16_t ch)
     if (!IS_MR_CHANNEL(ch))
         return 0;
 
-    EEPROM_ReadBuffer(0x0000 + (ch * 16), (uint8_t *)&freq, 4);
+    PY25Q16_ReadBuffer(0x0000 + (ch * 16), (uint8_t *)&freq, 4);
 
     if (freq == 0xFFFFFFFF || freq < 1400000 || freq > 130000000)
         return 0;
@@ -1032,8 +1030,9 @@ static void Measure() {
           peak.i = scanInfo.i;
         }
         if (settings.rssiTriggerLevelUp < 50) {gIsPeak = true;}
-        UpdateNoiseOff();
         UpdateGlitch();
+        UpdateNoiseOff();
+        
 
     } 
     if (!gIsPeak || !isListening)
@@ -1638,7 +1637,7 @@ static void LookupChannelModulation() {
 	  uint8_t tmp;
 		uint8_t data[8];
 
-		EEPROM_ReadBuffer(0x0000 + gChannel * 16 + 8, data, sizeof(data));
+		PY25Q16_ReadBuffer(0x0000 + gChannel * 16 + 8, data, sizeof(data));
 
 		tmp = data[3] >> 4;
 		if (tmp >= MODULATION_UKNOWN)
@@ -2085,7 +2084,7 @@ static void OnKeyDown(uint8_t key) {
                       Noislvl_OFF = isKey3 ? 
                                  (Noislvl_OFF >= 100 ? 30 : Noislvl_OFF + 1) :
                                  (Noislvl_OFF <= 30 ? 100 : Noislvl_OFF - 1);
-                      Noislvl_ON = Noislvl_OFF - 10;                      
+                      Noislvl_ON = NoisLvl - NoiseHysteresis;                      
                       break;
                   case 16: //osdPopupSetting
                       osdPopupSetting = isKey3 ? 
@@ -3197,7 +3196,7 @@ uint32_t BOARD_fetchChannelFrequency(const uint16_t Channel)
 		uint32_t offset;
 	} __attribute__((packed)) info;
 
-	EEPROM_ReadBuffer(0x0000 + Channel * 16, &info, sizeof(info));
+	PY25Q16_ReadBuffer(0x0000 + Channel * 16, &info, sizeof(info));
 	if (info.frequency == 0xFFFFFFFF) return 0;
 	else return info.frequency;
 }
@@ -3225,7 +3224,7 @@ void APP_RunSpectrum(uint8_t Spectrum_state)
         else if (Spectrum_state == 1) mode = CHANNEL_MODE ;
         else mode = FREQUENCY_MODE;
         //BK4819_SetFilterBandwidth(BK4819_FILTER_BW_NARROW, false);  // принудительно узкий в спектре ЧИНИМ ВФО
-        EEPROM_WriteBuffer(ADRESS_STATE, &Spectrum_state);
+        PY25Q16_WriteBuffer(ADRESS_STATE, &Spectrum_state, 1, 0);
         BOARD_gMR_LoadChannels();
         if (!Key_1_pressed) LoadSettings(0); 
         appMode = mode;
@@ -3341,13 +3340,13 @@ static void ToggleScanList(int scanListNumber, int single )
 
 #include "index.h"
 
-/* bool IsVersionMatching(void) {
+bool IsVersionMatching(void) {
     uint16_t stored,app_version;
     app_version = APP_VERSION;
-    EEPROM_ReadBuffer(ADRESS_VERSION, &stored, 2);
-    if (stored != APP_VERSION) EEPROM_WriteBuffer(ADRESS_VERSION, &app_version);
+    PY25Q16_ReadBuffer(ADRESS_VERSION, &stored, 2);
+    if (stored != APP_VERSION) PY25Q16_WriteBuffer(ADRESS_VERSION, &app_version, 1, 0);
     return (stored == APP_VERSION);
-} */
+}
 
 
 typedef struct {
@@ -3398,7 +3397,7 @@ void LoadSettings(bool LNA)
   BK4819_WriteRegister(BK4819_REG_13, eepromData.R13);
   BK4819_WriteRegister(BK4819_REG_14, eepromData.R14);
   if (LNA) return;
-  //To solve LATER if(!IsVersionMatching()) ClearSettings();
+  if(!IsVersionMatching()) ClearSettings();
   for (int i = 0; i < 24; i++) {
     settings.scanListEnabled[i] = (eepromData.scanListFlags >> i) & 0x01;
   }
@@ -3426,7 +3425,7 @@ void LoadSettings(bool LNA)
   IndexPS = eepromData.IndexPS;
   SpectrumSleepMs = PS_Steps[IndexPS];
   Noislvl_OFF = eepromData.Noislvl_OFF;
-  Noislvl_ON  = Noislvl_OFF-10; 
+  Noislvl_ON  = Noislvl_OFF - NoiseHysteresis; 
   UOO_trigger = eepromData.UOO_trigger;
   osdPopupSetting = eepromData.osdPopupSetting;
   Backlight_On_Rx = eepromData.Backlight_On_Rx;
@@ -3542,8 +3541,8 @@ void ClearSettings()
   IndexMaxLT = 0;
   IndexPS = 0;
   Backlight_On_Rx = 1;
-  Noislvl_OFF = 60; 
-  Noislvl_ON = 45;  
+  Noislvl_OFF = NoisLvl; 
+  Noislvl_ON = NoisLvl - NoiseHysteresis;  
   UOO_trigger = 15;
   osdPopupSetting = 500;
   GlitchMax = 10;  
@@ -3593,7 +3592,7 @@ static bool GetScanListLabel(uint8_t scanListIndex, char* bufferOut) {
 
     if (channel_name[0] == '\0') {
         uint32_t freq = 0xFFFFFFFF;
-        EEPROM_ReadBuffer(0x0000 + (first_channel * 16), (uint8_t *)&freq, 4);
+        PY25Q16_ReadBuffer(0x0000 + (first_channel * 16), (uint8_t *)&freq, 4);
 
         if (freq == 0xFFFFFFFF || freq < 1400000) {
             // jeżeli slot pusty lub uszkodzony, to nie pokazuj tej listy jako "valid"
