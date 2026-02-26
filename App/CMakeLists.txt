@@ -144,6 +144,7 @@ enable_feature(ENABLE_SPECTRUM
 enable_feature(ENABLE_BIG_FREQ)
 enable_feature(ENABLE_FLASH_BAND)
 enable_feature(ENABLE_FR_BAND)
+enable_feature(ENABLE_IN_BAND)
 enable_feature(ENABLE_KO_BAND)
 enable_feature(ENABLE_RU_BAND)
 enable_feature(ENABLE_SPECTRUM_LINES)

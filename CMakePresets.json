@@ -12,7 +12,7 @@
                 "ENABLE_LTO": false,
                 "ENABLE_FMRADIO": false,
                 "ENABLE_UART": false,
-                "ENABLE_USB": true,
+                "ENABLE_USB": false,
                 "ENABLE_NOAA": false,
                 "ENABLE_VOICE": false,
                 "ENABLE_VOX": false,
@@ -24,6 +24,7 @@
                 "ENABLE_SPECTRUM": true,
                 "ENABLE_FLASH_BAND": false,
                 "ENABLE_FR_BAND": false,
+                "ENABLE_IN_BAND": false,
                 "ENABLE_KO_BAND": false,
                 "ENABLE_BIG_FREQ": true,
                 "ENABLE_CUSTOM_MENU_LAYOUT": true,
@@ -75,12 +76,13 @@
         },
        
         {
-            "name": "Flash",
+            "name": "Usb",
             "inherits": "default",
             "cacheVariables": {
-                "ENABLE_FLASH_BAND": true,
-                "EDITION_STRING": "Flash",
-                "TARGET": "ROBZYL.K1.Flash"
+                "ENABLE_USB": true,
+                "ENABLE_IN_BAND": true,
+                "EDITION_STRING": "Usb",
+                "TARGET": "ROBZYL.K1.Usb"
             }
         },
         {
@@ -123,8 +125,8 @@
     ],
     "buildPresets": [
         {
-            "name": "Flash",
-            "configurePreset": "Flash"
+            "name": "Usb",
+            "configurePreset": "Usb"
         },
         {
             "name": "France",

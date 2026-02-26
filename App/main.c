@@ -53,6 +53,11 @@
     #include "driver/uart.h"
 #endif
 
+#ifdef ENABLE_USB
+#include "py32f071_ll_bus.h"
+#include "driver/vcp.h"
+#endif
+
 #include "helper/battery.h"
 #include "helper/boot.h"
 
@@ -169,28 +174,13 @@ void Main(void)
 
         gMenuListCount++;
     }
-
-    // wait for user to release all butts before moving on
-    if (GPIO_IsPttPressed() ||
-         KEYBOARD_Poll() != KEY_INVALID ||
-         BootMode != BOOT_MODE_NORMAL)
-    {   // keys are pressed
-        UI_DisplayReleaseKeys();
+        #ifdef ENABLE_USB
+            VCP_Init();
+        #endif
         BACKLIGHT_TurnOn();
-
-        // 500ms
-        for (int i = 0; i < 50;)
-        {
-            i = (!GPIO_IsPttPressed() && KEYBOARD_Poll() == KEY_INVALID) ? i + 1 : 0;
-            SYSTEM_DelayMs(10);
-        }
         gKeyReading0 = KEY_INVALID;
         gKeyReading1 = KEY_INVALID;
         gDebounceCounter = 0;
-    } else {
-        LL_APB1_GRP1_DisableClock(LL_APB1_GRP1_PERIPH_USBD); //USB DEACTIVATED
-    }
-
 
     if (!gChargingWithTypeC && gBatteryDisplayLevel == 0)
     {

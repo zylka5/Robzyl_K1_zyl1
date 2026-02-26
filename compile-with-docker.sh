@@ -44,9 +44,9 @@ fi
 # ---------------------------------------------
 # Validate preset name
 # ---------------------------------------------
-if [[ ! "$PRESET" =~ ^(Flash|France|Kolyan|Russia|Poland|All)$ ]]; then
+if [[ ! "$PRESET" =~ ^(Usb|France|Kolyan|Russia|Poland|All)$ ]]; then
   echo "❌ Unknown preset: '$PRESET'"
-  echo "Valid presets are: Flash, France, Kolyan,Russia,Poland, All"
+  echo "Valid presets are: Usb, France, Kolyan,Russia,Poland, All"
   exit 1
 fi
 
@@ -91,7 +91,7 @@ build_preset() {
 # Handle 'All' preset
 # ---------------------------------------------
 if [[ "$PRESET" == "All" ]]; then
-  PRESETS=(Flash France Kolyan Russia Poland)
+  PRESETS=(Usb France Kolyan Russia Poland)
   for p in "${PRESETS[@]}"; do
     build_preset "$p"
   done
@@ -107,8 +107,8 @@ fi
 
 # Définition du nom du binaire selon le preset
 case "$PRESET" in
-  "Flash")
-    BIN_NAME="ROBZYL.K1.Flash.bin"
+  "Usb")
+    BIN_NAME="ROBZYL.K1.Usb.bin"
     ;;
   "France")
     BIN_NAME="ROBZYL.K1.France.bin"

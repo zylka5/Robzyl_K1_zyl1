@@ -37,7 +37,13 @@
 #endif
 
 #define FM_CHANNELS_MAX 48
-#define MR_CHANNELS_MAX 500 //To solve LATER 1024
+
+#ifdef ENABLE_USB
+#define MR_CHANNELS_MAX 200 //To solve LATER 1024
+#else
+#define MR_CHANNELS_MAX 999 //To solve LATER 1024
+#endif
+
 #define MR_CHANNELS_LIST 10
 #define MENU_ITEMS 69
 

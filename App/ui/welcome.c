@@ -28,15 +28,13 @@
 #include "version.h"
 #include "bitmaps.h"
 
-#ifdef ENABLE_USB
-#include "driver/vcp.h"
-#endif
+
 
 #ifdef ENABLE_FEAT_ROBZYL_SCREENSHOT
     #include "screenshot.h"
 #endif
 
-void UI_DisplayReleaseKeys(void)
+/* void UI_DisplayReleaseKeys(void)
 {
     memset(gStatusLine,  0, sizeof(gStatusLine));
 #if defined(ENABLE_FEAT_ROBZYL_CTR) || defined(ENABLE_FEAT_ROBZYL_INV)
@@ -48,11 +46,14 @@ void UI_DisplayReleaseKeys(void)
     UI_PrintString("USB", 0, 127, 1, 10);
     UI_PrintString("ACTIVATED", 0, 127, 3, 10);
     VCP_Init();
+#else 
+    UI_PrintString("USB", 0, 127, 1, 10);
+    UI_PrintString("REMOVED", 0, 127, 3, 10);
 #endif
     ST7565_BlitStatusLine();  // blank status line
     ST7565_BlitFullScreen();
 }
-
+ */
 void UI_DisplayWelcome(void)
 {
     char WelcomeString0[16];
