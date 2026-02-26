@@ -187,7 +187,10 @@ void Main(void)
         gKeyReading0 = KEY_INVALID;
         gKeyReading1 = KEY_INVALID;
         gDebounceCounter = 0;
+    } else {
+        LL_APB1_GRP1_DisableClock(LL_APB1_GRP1_PERIPH_USBD); //USB DEACTIVATED
     }
+
 
     if (!gChargingWithTypeC && gBatteryDisplayLevel == 0)
     {

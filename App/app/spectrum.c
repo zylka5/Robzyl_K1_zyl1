@@ -2343,7 +2343,7 @@ static void OnKeyDown(uint8_t key) {
 /* next mode poprawione */ //СМЕНА РЕЖИМОВ
      case KEY_6:
         // 0 = FR, 1 = SL, 2 = BD, 3 = RG
-        if (Spectrum_state++ > 3) {Spectrum_state = 0;}
+        if (++Spectrum_state > 3) {Spectrum_state = 0;}
         PY25Q16_WriteBuffer(ADRESS_STATE, &Spectrum_state, 1, 0);
         char sText[32];
         const char* s[] = {"FREQ", "S LIST", "BAND", "RANGE"};
