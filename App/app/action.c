@@ -249,7 +249,7 @@ void ACTION_Scan(bool bRestart)
         gScanPauseDelayIn_10ms = 1;
         gScheduleScanListen    = false;
     } else {
-        #ifdef ENABLE_FEAT_ROBZYL_RESUME_STATE
+        #ifdef ENABLE_SCAN_RANGES
         if(gScanRangeStart == 0) // No ScanRange
         {
             gEeprom.CURRENT_STATE = 1;
