@@ -1,3 +1,4 @@
+//K1
 /* Copyright 2023 Dual Tachyon
  * https://github.com/DualTachyon
  *
@@ -1111,11 +1112,13 @@ void RADIO_SetModulation(ModulationMode_t modulation)
         BK4819_WriteRegister(0x2a,0x7434);
         BK4819_WriteRegister(0x2b,0x300);
         BK4819_WriteRegister(0x2f,0x9990);
-        //BK4819_WriteRegister(0x54, 0x9775);
-        //BK4819_WriteRegister(0x55, 0x32c6);
 
-        BK4819_WriteRegister(0x54, 0x8846);
-        BK4819_WriteRegister(0x55, 0x38C0);
+         // steef values
+        //BK4819_WriteRegister(0x54, 0x8546);
+        //BK4819_WriteRegister(0x55, 0x3af0);
+
+        //BK4819_WriteRegister(0x54, 0x9775);  // calypso
+        //BK4819_WriteRegister(0x55, 0x32c6);  // removed for better AM reception
 
         BK4819_SetFilterBandwidth(BK4819_FILTER_BW_AM, true);
     }
@@ -1123,39 +1126,44 @@ void RADIO_SetModulation(ModulationMode_t modulation)
     BK4819_SetRegValue(afDacGainRegSpec, 0xF);
     BK4819_WriteRegister(BK4819_REG_3D, modulation == MODULATION_USB ? 0 : 0x2AAB);
     BK4819_SetRegValue(afcDisableRegSpec, modulation != MODULATION_FM);
+    RADIO_SetupAGC(modulation == MODULATION_AM, false); //Calypso ?
 
-    //RADIO_SetupAGC(modulation == MODULATION_AM, false);
-    RADIO_SetupAGC(false, false);
 }
 
-void RADIO_SetupAGC(bool listeningAM, bool disable)
+void RADIO_SetupAGC(bool listeningAM, bool disable) //Calypso modifications
 {
+    //listeningAM = false;
+    disable = false;
+
     static uint8_t lastSettings;
     uint8_t newSettings = (listeningAM << 1) | disable;
     if(lastSettings == newSettings)
         return;
     lastSettings = newSettings;
 
+    BK4819_SetAGC(!disable);
+    BK4819_InitAGC(listeningAM);
+    
 
-    if(!listeningAM) { // if not actively listening AM we don't need any AM specific regulation
-        BK4819_SetAGC(!disable);
-        BK4819_InitAGC(MODULATION_FM);
-    }
-    else {
-#ifdef ENABLE_AM_FIX
-        if(gSetting_AM_fix) { // if AM fix active lock AGC so AM-fix can do it's job
-            BK4819_SetAGC(0);
-            AM_fix_enable(!disable);
-        }
-        else
-#endif
-        {
-            BK4819_SetAGC(!disable);
-            BK4819_InitAGC(MODULATION_AM);
-        }
-    }
 }
 
+// ============================================================================
+// VFO STATE MANAGEMENT
+// ============================================================================
+
+/**
+ * @brief Set the current VFO state (normal, busy, low battery, etc)
+ * @param State VFO state to set (VFO_STATE_t enum)
+ * 
+ * States indicate why TX might be disabled:
+ * - VFO_STATE_NORMAL: OK to transmit
+ * - VFO_STATE_BUSY: RX in progress
+ * - VFO_STATE_BAT_LOW: Battery critically low
+ * - VFO_STATE_TX_DISABLE: TX frequency/mode not allowed
+ * - VFO_STATE_VOLTAGE_HIGH: Over-voltage detected
+ * - VFO_STATE_TIMEOUT: TX timeout reached
+ * - VFO_STATE_ALARM: Alarm/special mode active
+ */
 void RADIO_SetVfoState(VfoState_t State)
 {
     if (State == VFO_STATE_NORMAL) {

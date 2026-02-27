@@ -169,7 +169,7 @@ void BK4819_Init(void)
 
     BK4819_WriteRegister(0x73, 0x4691);
     BK4819_WriteRegister(0x77, 0x88EF);
-    BK4819_WriteRegister(BK4819_REG_19, 0x1041);
+    BK4819_WriteRegister(BK4819_REG_19, 0x104E);
     BK4819_WriteRegister(BK4819_REG_28, 0x0B40);
     BK4819_WriteRegister(BK4819_REG_29, 0xAA00);
     BK4819_WriteRegister(0x2A, 0x6600);
@@ -705,8 +705,18 @@ void BK4819_SetFilterBandwidth(const BK4819_FilterBandwidth_t Bandwidth, const b
             val = 0x205C;
             break;
 
-        case BK4819_FILTER_BW_AM:   // 12 kHz, old value: 8.33kHz 0x4858 (lijkt 6kHz)
-            val = 0x3028; // Old value 0x4858;
+        case BK4819_FILTER_BW_AM:   // 8.33kHz
+            // if (weak_no_different) {
+            //     // make the RX bandwidth the same with weak signals
+            //     val = 0x4858;
+            // } else {
+            //     // with weak RX signals the RX bandwidth is reduced
+            //     val = 0x4458;
+            // }
+            val = 0x345C;
+            break;
+        default:
+            val = 0x5C;
             break;
     }
 
