@@ -19,6 +19,9 @@
 
 #include "../bitmaps.h"
 #include "../board.h"
+#ifdef K5
+  #include "../bsp/dp32g030/gpio.h"
+#endif
 #include "../driver/bk4819-regs.h"
 #include "../driver/bk4819.h"
 #include "../driver/gpio.h"
@@ -150,7 +153,6 @@ typedef enum ScanList {
   S_SCAN_LIST_15,
   S_SCAN_LIST_ALL
 } ScanList;
-
 #ifdef ENABLE_FLASH_BAND
 typedef struct __attribute__((packed)) bandparameters { 
     char BandName[12];        // 12 bytes
@@ -170,9 +172,11 @@ typedef struct bandparameters {
 } bandparameters;
 #endif
 
-#define MAX_VALID_SCANLISTS 10
-#define MAX_BANDS 64
+#ifdef K5
+    #define MR_CHANNELS_LIST 15
+#endif
 
+#define MAX_BANDS 64
 typedef struct SpectrumSettings {
   uint32_t frequencyChangeStep;  
   StepsCount stepsCount;
@@ -185,7 +189,7 @@ typedef struct SpectrumSettings {
   int16_t dbMax;  
   ModulationMode_t modulationType;
   int scanList;
-  bool scanListEnabled[MAX_VALID_SCANLISTS];
+  bool scanListEnabled[MR_CHANNELS_LIST];
   bool bandEnabled[MAX_BANDS];
 } SpectrumSettings;
 
@@ -208,10 +212,12 @@ typedef struct PeakInfo {
   uint32_t f;
   uint16_t i;
 } PeakInfo;
-
-void APP_RunSpectrum(void);
-//void LookupChannelInfo();
-//void LookupChannelModulation();
+#ifdef K1
+  void APP_RunSpectrum(void);
+#endif
+#ifdef K5
+  void APP_RunSpectrum(uint8_t Spectrum_state);        
+#endif
 void ClearSettings(void);
 void LoadSettings(bool LNA);
 
