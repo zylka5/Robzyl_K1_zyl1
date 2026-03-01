@@ -141,7 +141,6 @@ enable_feature(ENABLE_FLASHLIGHT
 enable_feature(ENABLE_SPECTRUM
     app/spectrum.c
 )
-enable_feature(K1)
 enable_feature(ENABLE_BIG_FREQ)
 enable_feature(ENABLE_FLASH_BAND)
 enable_feature(ENABLE_FR_BAND)
