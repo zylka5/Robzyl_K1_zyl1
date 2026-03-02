@@ -51,7 +51,12 @@ void SysTick_Handler(void)
     
     gNextTimeslice = true;
     gNextTimeslice_10ms = true;
-
+    if ((gGlobalSysTickCounter % 100) == 0)
+	{
+		gNextTimeslice_1s = true;
+		//txTimeSeconds++;//To solve LATER
+		//rxTimeSeconds++;
+	} 
     if ((gGlobalSysTickCounter % 50) == 0) {
         gNextTimeslice_500ms = true;
     }
@@ -60,13 +65,6 @@ void SysTick_Handler(void)
     }
     if ((gGlobalSysTickCounter % 50) == 0) {
         gNextTimeslice_500ms = true;
-    }
-    if ((gGlobalSysTickCounter % 100) == 0)
-	{
-		gNextTimeslice_1s = true;
-		//txTimeSeconds++;//To solve LATER
-		//rxTimeSeconds++;
-	} 
 
 #ifdef ENABLE_FEAT_ROBZYL
         DECREMENT_AND_TRIGGER(gVfoSaveCountdown_10ms, gScheduleVfoSave);
@@ -78,7 +76,7 @@ void SysTick_Handler(void)
         
         DECREMENT_AND_TRIGGER(gTxTimerCountdown_500ms, gTxTimeoutReached);
         DECREMENT(gSerialConfigCountDown_500ms);
-    
+    }
 
     if ((gGlobalSysTickCounter & 3) == 0)
         gNextTimeslice40ms = true;
