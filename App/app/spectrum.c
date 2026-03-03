@@ -3562,6 +3562,7 @@ static void SaveSettings()
   eepromData.UOO_trigger = UOO_trigger;
   eepromData.osdPopupSetting = osdPopupSetting;
   eepromData.GlitchMax = 10;
+  eepromData.Spectrum_state = Spectrum_state; 
   if (GlitchMax < 30) eepromData.GlitchMax  = GlitchMax;    
   eepromData.SoundBoost = SoundBoost;
   
@@ -3634,6 +3635,7 @@ void ClearSettings()
   UOO_trigger = 15;
   osdPopupSetting = 500;
   GlitchMax = 10;  
+  Spectrum_state = 1; 
   SoundBoost = 1;  
   settings.bandEnabled[0] = 1;
   BK4819_WriteRegister(BK4819_REG_10, 0x0145);
