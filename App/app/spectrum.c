@@ -1297,19 +1297,14 @@ static int16_t Rssi2Y(uint16_t rssi) {
   return DrawingEndY + delta -Rssi2PX(rssi, delta, DrawingEndY);
 }
 
-
-static void DrawSpectrum()
-{
-        const uint8_t left_margin  = 3;
-        const uint8_t right_margin = 3;
-        const uint8_t graph_width  = 128 - left_margin - right_margin;
-
-        for (uint8_t i = 0; i < graph_width && i < 128; ++i) {
-            uint8_t x = left_margin + i;
-            uint16_t rssi = rssiHistory[i];
-
-            if (rssi != RSSI_MAX_VALUE) {
-                DrawVLine(Rssi2Y(rssi), DrawingEndY, x, true);
+static void DrawSpectrum(void) {
+    int16_t y_baseline = Rssi2Y(0); 
+    for (uint8_t i = 0; i < 127; i++) {
+        uint8_t val_curr = rssiHistory[i];
+        uint8_t val_next = rssiHistory[i + 1];
+        int16_t y_curr = Rssi2Y(val_curr);
+        for (int16_t y = y_curr; y <= y_baseline; y++) {
+                gFrameBuffer[y >> 3][i] |= (1 << (y & 7));
             }
         }
 }
