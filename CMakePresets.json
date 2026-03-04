@@ -77,16 +77,6 @@
         },
        
         {
-            "name": "Usb",
-            "inherits": "default",
-            "cacheVariables": {
-                "ENABLE_USB": true,
-                "ENABLE_FR_BAND": true,
-                "EDITION_STRING": "Usb",
-                "TARGET": "ROBZYL.K1.Usb"
-            }
-        },
-        {
             "name": "France",
             "inherits": "default",
             "cacheVariables": {
@@ -122,13 +112,72 @@
                 "EDITION_STRING": "Poland",
                 "TARGET": "ROBZYL.K1.Poland"
             }
+        },
+        {
+            "name": "SR",
+            "inherits": "default",
+            "cacheVariables": {
+                "ENABLE_SR_BAND": true,
+                "EDITION_STRING": "SR",
+                "TARGET": "ROBZYL.K1.SR"
+            }
+        },
+        {
+            "name": "Finland",
+            "inherits": "default",
+            "cacheVariables": {
+                "ENABLE_FI_BAND": true,
+                "EDITION_STRING": "Finland",
+                "TARGET": "ROBZYL.K1.Finland"
+            }
+        },
+        {
+            "name": "International",
+            "inherits": "default",
+            "cacheVariables": {
+                "ENABLE_IN_BAND": true,
+                "EDITION_STRING": "International",
+                "TARGET": "ROBZYL.K1.International"
+            }
+        },
+        {
+            "name": "Brasil",
+            "inherits": "default",
+            "cacheVariables": {
+                "ENABLE_BR_BAND": true,
+                "EDITION_STRING": "Brasil",
+                "TARGET": "ROBZYL.K1.Brasil"
+            }
+        },
+        {
+            "name": "Romania",
+            "inherits": "default",
+            "cacheVariables": {
+                "ENABLE_RO_BAND": true,
+                "EDITION_STRING": "Romania",
+                "TARGET": "ROBZYL.K1.Romania"
+            }
+        },
+        {
+            "name": "Czech",
+            "inherits": "default",
+            "cacheVariables": {
+                "ENABLE_CZ_BAND": true,
+                "EDITION_STRING": "Czech",
+                "TARGET": "ROBZYL.K1.Czech"
+            }
+        },
+        {
+            "name": "Turkey",
+            "inherits": "default",
+            "cacheVariables": {
+                "ENABLE_TU_BAND": true,
+                "EDITION_STRING": "Turkey",
+                "TARGET": "ROBZYL.K1.Turkey"
+            }
         }
     ],
     "buildPresets": [
-        {
-            "name": "Usb",
-            "configurePreset": "Usb"
-        },
         {
             "name": "France",
             "configurePreset": "France"
@@ -144,6 +193,34 @@
         {
             "name": "Poland",
             "configurePreset": "Poland"
+        },
+        {
+            "name": "SR",
+            "configurePreset": "SR"
+        },
+        {
+            "name": "Finland",
+            "configurePreset": "Finland"
+        },
+        {
+            "name": "International",
+            "configurePreset": "International"
+        },
+        {
+            "name": "Brasil",
+            "configurePreset": "Brasil"
+        },
+        {
+            "name": "Romania",
+            "configurePreset": "Romania"
+        },
+        {
+            "name": "Czech",
+            "configurePreset": "Czech"
+        },
+        {
+            "name": "Turkey",
+            "configurePreset": "Turkey"
         }
     ]
 }

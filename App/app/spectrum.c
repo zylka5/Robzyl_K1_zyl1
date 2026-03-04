@@ -1300,9 +1300,7 @@ static int16_t Rssi2Y(uint16_t rssi) {
 static void DrawSpectrum(void) {
     int16_t y_baseline = Rssi2Y(0); 
     for (uint8_t i = 0; i < 127; i++) {
-        uint8_t val_curr = rssiHistory[i];
-        uint8_t val_next = rssiHistory[i + 1];
-        int16_t y_curr = Rssi2Y(val_curr);
+        int16_t y_curr = Rssi2Y(rssiHistory[i]);
         for (int16_t y = y_curr; y <= y_baseline; y++) {
                 gFrameBuffer[y >> 3][i] |= (1 << (y & 7));
             }
