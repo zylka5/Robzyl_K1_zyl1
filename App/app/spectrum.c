@@ -3024,24 +3024,16 @@ static void UpdateScan() {
 
   SetF(scanInfo.f);
   Measure();
-  
-  // Si un signal est trouvé (gIsPeak), la fonction s'arrête ici grâce au return ci-dessus
-  // au prochain passage (via UpdateListening).
   if(gIsPeak || SpectrumMonitor || WaitSpectrum) return;
-
-  // --- MODIFICATION ICI ---
   if (gHistoryScan && historyListActive) {
       NextHistoryScanStep();
       return;
   }
-  // ------------------------
-
   if (scanInfo.i < GetStepsCount()) {
     NextScanStep();
     return;
   }
   
-  // Scan end
   newScanStart = true; 
   Fmax = peak.f;
   
