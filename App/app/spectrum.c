@@ -12,7 +12,6 @@
 #include "ui/main.h"
 #include "driver/py25q16.h"
 #include "version.h"
-#include <stdlib.h>  // malloc/free
 //#include "debugging.h"
 
 /*	
@@ -65,9 +64,6 @@ static bool gCounthistory = 1;               // case 17
 //ClearSettings                              // case 19      
 #define PARAMETER_COUNT 20
 ////////////////////////////////////////////////////////////////////
-
-static uint16_t *scanChannel = NULL;
-static uint8_t  *ScanListNumber = NULL;
 
 static bool SettingsLoaded = false;
 uint8_t  gKeylockCountdown = 0;
@@ -132,8 +128,8 @@ static uint16_t ctcssFreq;
 #define Bottom_print 51 //Robby69
 static Mode appMode;
 #define UHF_NOISE_FLOOR 5
-//static uint16_t scanChannel[MR_CHANNEL_LAST + 3];
-//static uint8_t ScanListNumber[MR_CHANNEL_LAST + 3];
+static uint16_t scanChannel[MR_CHANNEL_LAST + 3];
+static uint8_t ScanListNumber[MR_CHANNEL_LAST + 3];
 static uint16_t scanChannelsCount;
 static void ToggleScanList();
 static void SaveSettings();
@@ -161,8 +157,7 @@ typedef struct
 {
 	uint32_t     Frequency;
 }  __attribute__((packed)) ChannelFrequencyAttributes;
-//ChannelFrequencyAttributes gMR_ChannelFrequencyAttributes[MR_CHANNEL_LAST +1];
-ChannelFrequencyAttributes *gMR_ChannelFrequencyAttributes = NULL;
+ChannelFrequencyAttributes gMR_ChannelFrequencyAttributes[MR_CHANNEL_LAST +1];
 
 SpectrumSettings settings = {stepsCount: STEPS_128,
                              scanStepIndex: S_STEP_500kHz,
@@ -204,23 +199,6 @@ static uint8_t validScanListIndices[MAX_VALID_SCANLISTS]; // stocke les index va
 static void MyDrawShortHLine(uint8_t y, uint8_t x_start, uint8_t x_end, uint8_t step, bool white); //ПРОСТОЙ РЕЖИМ ЛИНИИ
 static void MyDrawVLine(uint8_t x, uint8_t y_start, uint8_t y_end, uint8_t step); //ПРОСТОЙ РЕЖИМ ЛИНИИ
 #endif
-#include <errno.h>
-#include <sys/types.h>
-
-extern char _end; // Définie par le script de liaison (.ld)
-
-caddr_t _sbrk(int incr) {
-    static char *heap_end;
-    char *prev_heap_end;
-
-    if (heap_end == 0) {
-        heap_end = &_end;
-    }
-    prev_heap_end = heap_end;
-    heap_end += incr;
-    return (caddr_t)prev_heap_end;
-}
-
 
 const RegisterSpec allRegisterSpecs[] = {
  //   {"10_LNAs",  0x10, 8, 0b11,  1},
@@ -1319,13 +1297,12 @@ static int16_t Rssi2Y(uint16_t rssi) {
   return DrawingEndY + delta -Rssi2PX(rssi, delta, DrawingEndY);
 }
 
-
-static void DrawSpectrum()
-{
-        for (uint8_t i = 0; i < 128 && i < 128; ++i) {
-            uint16_t rssi = rssiHistory[i];
-            if (rssi != RSSI_MAX_VALUE) {
-                DrawVLine(Rssi2Y(rssi), DrawingEndY, i, true);
+static void DrawSpectrum(void) {
+    int16_t y_baseline = Rssi2Y(0); 
+    for (uint8_t i = 0; i < 127; i++) {
+        int16_t y_curr = Rssi2Y(rssiHistory[i]);
+        for (int16_t y = y_curr; y <= y_baseline; y++) {
+                gFrameBuffer[y >> 3][i] |= (1 << (y & 7));
             }
         }
 }
@@ -2228,6 +2205,8 @@ static void OnKeyDown(uint8_t key) {
 
     case KEY_8://СМЕНА РЕЖИМА
       if (historyListActive) {
+          memset(HCount,0,sizeof(HCount));
+          memset(HBlacklisted,0,sizeof(HBlacklisted));
           historyListIndex = 0;
           historyScrollOffset = 0;
           indexFs = 0;
@@ -3248,24 +3227,8 @@ void BOARD_gMR_LoadChannels() {
 	}
 }
 
-void MEM_InitChannels(void) {
-    uint32_t totalSize = (MR_CHANNEL_LAST + 1) * sizeof(ChannelFrequencyAttributes);     //4*1000 = 4ko
-    gMR_ChannelFrequencyAttributes = (ChannelFrequencyAttributes *)malloc(totalSize);
-    scanChannel = (uint16_t *)malloc((MR_CHANNEL_LAST + 3) * sizeof(uint16_t));         //2*1000 = 2ko
-    ScanListNumber = (uint8_t *)malloc((MR_CHANNEL_LAST + 3) * sizeof(uint8_t));        //1ko
-}
-void FreeMemory (void){
-    free(scanChannel);
-    scanChannel = NULL;
-    free(ScanListNumber);
-    ScanListNumber = NULL;
-    free(gMR_ChannelFrequencyAttributes);
-    gMR_ChannelFrequencyAttributes = NULL;
-}
-
 void APP_RunSpectrum(void)
 {
-    MEM_InitChannels();
     for (;;) {
         Mode mode;
         if (!Key_1_pressed || gComeBack) LoadSettings(); 
@@ -3317,7 +3280,6 @@ void APP_RunSpectrum(void)
         historyListActive = false;
         while (isInitialized) {Tick();}
         RestoreRegisters();
-        FreeMemory();
         break;
     } 
 }
@@ -3333,7 +3295,7 @@ uint16_t RADIO_ValidMemoryChannelsCount(bool bCheckScanList, uint8_t CurrentScan
 
 static void LoadValidMemoryChannels(void)
 {
-    memset(scanChannel, 0, (MR_CHANNEL_LAST + 3) * sizeof(uint16_t));
+    memset(scanChannel,0,sizeof(scanChannel));
     scanChannelsCount = 0;
     bool listsEnabled = false;
     for (int CurrentScanList = 1; CurrentScanList <= MAX_VALID_SCANLISTS; CurrentScanList++)
