@@ -391,27 +391,16 @@ void UI_DrawRectangleBuffer(uint8_t (*buffer)[128], int16_t x1, int16_t y1, int1
     UI_DrawLineBuffer(buffer, x1,y2, x2,y2, black);
 }
 
-
 void UI_DisplayPopup(const char *string)
 {
-    UI_DisplayClear();
+    for(uint8_t i = 2; i < 4; i++) {
+        memset(gFrameBuffer[i], 0x00, 128);
+    }
+    UI_PrintString(string, 12, 116, 2, 8);
+    for (uint8_t x = 0; x < 128; x++) {
+        gFrameBuffer[2][x] ^= 0xFF;
+        gFrameBuffer[3][x] ^= 0xFF;}
 
-    // for(uint8_t i = 1; i < 5; i++) {
-    //  memset(gFrameBuffer[i]+8, 0x00, 111);
-    // }
-
-    // for(uint8_t x = 10; x < 118; x++) {
-    //  UI_DrawPixelBuffer(x, 10, true);
-    //  UI_DrawPixelBuffer(x, 46-9, true);
-    // }
-
-    // for(uint8_t y = 11; y < 37; y++) {
-    //  UI_DrawPixelBuffer(10, y, true);
-    //  UI_DrawPixelBuffer(117, y, true);
-    // }
-    // DrawRectangle(9,9, 118,38, true);
-    UI_PrintString(string, 9, 118, 2, 8);
-    UI_PrintStringSmallNormal("Press EXIT", 9, 118, 6);
 }
 
 void UI_DisplayClear()

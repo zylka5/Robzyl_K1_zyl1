@@ -355,7 +355,7 @@ static char osdPopupText[32] = "";
 static void ShowOSDPopup(const char *str)
 {   osdPopupTimer = osdPopupSetting;
     strncpy(osdPopupText, str, sizeof(osdPopupText)-1);
-    osdPopupText[sizeof(osdPopupText)-1] = '\0';  // Zabezpieczenie przed przepełnieniem
+    osdPopupText[sizeof(osdPopupText)-1] = '\0';
 }
 
 static uint32_t stillFreq = 0;
@@ -536,20 +536,6 @@ static void DeInitSpectrum() {
   ToggleRX(0);
   SYSTEM_DelayMs(50);
 }
-
-/////////////////////////////EEPROM://///////////////////////////
-
-#ifdef ENABLE_FLASH_BAND
-static bandparameters BParams[64];
-void LoadBandsFromEEPROM(void) {
-    uint16_t currentAddress = ADRESS_BANDS;
-    for(int i = 0; i < 64; i++) {
-        // On lit chaque structure une par une (32 octets chacune)
-        PY25Q16_ReadBuffer(ADRESS_BANDS, (void*)&BParams[i], sizeof(bandparameters));
-        currentAddress += sizeof(bandparameters);
-    }
-}
-#endif
 
 // *****************************************************************************
 // Fonction : Supprime la fréquence sélectionnée de la liste d'historique en RAM
@@ -1501,15 +1487,15 @@ static void DrawF(uint32_t f) {
             if (ShowLines == 2) {
                 UI_DisplayFrequency(line1, 10, 0, 0);  // BIG FREQUENCY
                 GUI_DisplaySmallest(StringCode, 80, 17, false, false);  // CSS субтон
-                GUI_DisplaySmallest(line2,      2, 17, false, true);  // имя канала / бэнд / список
+                GUI_DisplaySmallest(line2,      34, 17, false, true);  // имя канала / бэнд / список
+                for (uint8_t x = 32; x < 96; x++) {gFrameBuffer[2][x] ^= 0x7F;}
                 ArrowLine = 3;
             }
 
             if (ShowLines == 1) {
                 UI_PrintStringSmallbackground(line1b, 1, LCD_WIDTH - 1, 0, 0);  // F + CSS
                 UI_PrintStringSmallbackground(line2,  1, LCD_WIDTH - 1, 1, 0);  // SL or BD + Name
-                GUI_DisplaySmallest(line3, 2,17, false, true);  // таймеры
-
+                GUI_DisplaySmallest(line3, 34,17, false, true);  // таймеры
                 ArrowLine = 3;
             }
 
@@ -1522,7 +1508,7 @@ static void DrawF(uint32_t f) {
               }
               UI_PrintStringSmallbackground(lastRxFreq, 1, LCD_WIDTH - 1, 0, 0);
               UI_PrintStringSmallbackground(lastRx, 1, LCD_WIDTH - 1, 1, 0);
-              GUI_DisplaySmallest(line3, 2, 17, false, true);
+              GUI_DisplaySmallest(line3, 34, 17, false, true);
               ArrowLine = 3;
             }
     if (Fmax) 
@@ -2564,8 +2550,8 @@ static void OnKeyDownStill(KEY_Code_t key) {
         }
         if (storedScanStepIndex != -1) {
             settings.scanStepIndex = storedScanStepIndex;
-            scanInfo.scanStep = settings.scanStepIndex;
             storedScanStepIndex = -1;
+            scanInfo.scanStep = settings.scanStepIndex;
         }
         SetState(SPECTRUM);
         WaitSpectrum = 0; //Prevent coming back to still directly
@@ -3138,7 +3124,7 @@ static void Tick() {
     if (isListening || SpectrumMonitor || WaitSpectrum) UpdateListening(); 
     if(SpectrumPauseCount) SpectrumPauseCount--;
     if (osdPopupTimer > 0) {
-        UI_DisplayPopup(osdPopupText);  // Wyświetl aktualny tekst
+        UI_DisplayPopup(osdPopupText);
         ST7565_BlitFullScreen();
         osdPopupTimer -= 10; 
         if (osdPopupTimer <= 0) {osdPopupText[0] = '\0';}
@@ -3872,52 +3858,8 @@ static void RenderParametersSelect() {
 }
 
 
-#ifdef ENABLE_FLASH_BAND
+#ifdef ENABLE_FULL_BAND
       void RenderBandSelect() {RenderList("BANDS:", ARRAY_SIZE(BParams),bandListSelectedIndex, bandListScrollOffset, GetBandItemText);}
-#endif
-
-#ifdef ENABLE_FR_BAND
-      void RenderBandSelect() {RenderList("FRA BANDS:", ARRAY_SIZE(BParams),bandListSelectedIndex, bandListScrollOffset, GetBandItemText);}
-#endif
-
-#ifdef ENABLE_SR_BAND
-      void RenderBandSelect() {RenderList("SR BANDS:", ARRAY_SIZE(BParams),bandListSelectedIndex, bandListScrollOffset, GetBandItemText);}
-#endif
-
-#ifdef ENABLE_IN_BAND
-      void RenderBandSelect() {RenderList("INT BANDS:", ARRAY_SIZE(BParams),bandListSelectedIndex, bandListScrollOffset, GetBandItemText);}
-#endif
-
-#ifdef ENABLE_FI_BAND
-      void RenderBandSelect() {RenderList("FI BANDS:", ARRAY_SIZE(BParams),bandListSelectedIndex, bandListScrollOffset, GetBandItemText);}
-#endif
-
-#ifdef ENABLE_BR_BAND
-      void RenderBandSelect() {RenderList("BR BANDS:", ARRAY_SIZE(BParams),bandListSelectedIndex, bandListScrollOffset, GetBandItemText);}
-#endif
-
-#ifdef ENABLE_PL_BAND
-      void RenderBandSelect() {RenderList("POL BANDS:", ARRAY_SIZE(BParams),bandListSelectedIndex, bandListScrollOffset, GetBandItemText);}
-#endif
-
-#ifdef ENABLE_RO_BAND
-      void RenderBandSelect() {RenderList("ROM BANDS:", ARRAY_SIZE(BParams),bandListSelectedIndex, bandListScrollOffset, GetBandItemText);}
-#endif
-
-#ifdef ENABLE_KO_BAND
-      void RenderBandSelect() {RenderList("KOL BANDS:", ARRAY_SIZE(BParams),bandListSelectedIndex, bandListScrollOffset, GetBandItemText);}
-#endif
-
-#ifdef ENABLE_CZ_BAND
-      void RenderBandSelect() {RenderList("CZ BANDS:", ARRAY_SIZE(BParams),bandListSelectedIndex, bandListScrollOffset, GetBandItemText);}
-#endif
-
-#ifdef ENABLE_TU_BAND
-      void RenderBandSelect() {RenderList("TU BANDS:", ARRAY_SIZE(BParams),bandListSelectedIndex, bandListScrollOffset, GetBandItemText);}
-#endif
-
-#ifdef ENABLE_RU_BAND
-      void RenderBandSelect() {RenderList("RUS BANDS:", ARRAY_SIZE(BParams),bandListSelectedIndex, bandListScrollOffset, GetBandItemText);}
 #endif
 
 static void RenderHistoryList() {

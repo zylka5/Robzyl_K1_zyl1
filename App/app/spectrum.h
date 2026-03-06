@@ -178,7 +178,7 @@ typedef struct bandparameters {
 #endif
 
 #define MAX_VALID_SCANLISTS 10
-#define MAX_BANDS 64
+#define MAX_BANDS 51
 
 typedef struct SpectrumSettings {
   uint32_t frequencyChangeStep;  

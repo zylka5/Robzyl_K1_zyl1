@@ -12,7 +12,7 @@
                 "ENABLE_LTO": false,
                 "ENABLE_FMRADIO": true,
                 "ENABLE_UART": false,
-                "ENABLE_USB": true,
+                "ENABLE_USB": false,
                 "ENABLE_AIRCOPY": false,
                 "ENABLE_NOAA": false,
                 "ENABLE_VOICE": false,
@@ -25,9 +25,7 @@
                 "ENABLE_SPECTRUM": true,
                 "ENABLE_FLASH_BAND": false,
                 "ENABLE_DEV": false,
-                "ENABLE_FR_BAND": false,
-                "ENABLE_IN_BAND": false,
-                "ENABLE_KO_BAND": false,
+                "ENABLE_FULL_BAND": true,
                 "ENABLE_BIG_FREQ": true,
                 "ENABLE_SMALL_BOLD": true,
                 "ENABLE_CUSTOM_MENU_LAYOUT": true,
@@ -85,110 +83,37 @@
             "name": "Dev",
             "inherits": "default",
             "cacheVariables": {
-                "ENABLE_FR_BAND": true,
                 "ENABLE_DEV": true,
+                "ENABLE_USB": true,
+                "ENABLE_UART": false,
                 "EDITION_STRING": "Dev",
                 "TARGET": "ROBZYL.K1.Dev"
             }
         },
         {
-            "name": "France",
+            "name": "USB",
             "inherits": "default",
             "cacheVariables": {
-                "ENABLE_FR_BAND": true,
-                "EDITION_STRING": "France",
-                "TARGET": "ROBZYL.K1.France"
+                "ENABLE_USB": true,
+                "EDITION_STRING": "USB",
+                "TARGET": "ROBZYL.K1.USB"
             }
         },
         {
-            "name": "Kolyan",
+            "name": "RS232",
             "inherits": "default",
             "cacheVariables": {
-                "ENABLE_KO_BAND": true,
-                "EDITION_STRING": "Kolyan",
-                "TARGET": "ROBZYL.K1.Kolyan"
+                "ENABLE_UART": true,
+                "EDITION_STRING": "RS232",
+                "TARGET": "ROBZYL.K1.RS232"
             }
         },
         {
-            "name": "Russia",
+            "name": "NO_COM",
             "inherits": "default",
             "cacheVariables": {
-                "ENABLE_RU_BAND": true,
-                "ENABLE_SPECTRUM_LINES": true,
-                "EDITION_STRING": "Russia",
-                "TARGET": "ROBZYL.K1.Russia"
-            }
-        },
-        {
-            "name": "Poland",
-            "inherits": "default",
-            "cacheVariables": {
-                "ENABLE_PL_BAND": true,
-                "EDITION_STRING": "Poland",
-                "TARGET": "ROBZYL.K1.Poland"
-            }
-        },
-        {
-            "name": "SR",
-            "inherits": "default",
-            "cacheVariables": {
-                "ENABLE_SR_BAND": true,
-                "EDITION_STRING": "SR",
-                "TARGET": "ROBZYL.K1.SR"
-            }
-        },
-        {
-            "name": "Finland",
-            "inherits": "default",
-            "cacheVariables": {
-                "ENABLE_FI_BAND": true,
-                "EDITION_STRING": "Finland",
-                "TARGET": "ROBZYL.K1.Finland"
-            }
-        },
-        {
-            "name": "International",
-            "inherits": "default",
-            "cacheVariables": {
-                "ENABLE_IN_BAND": true,
-                "EDITION_STRING": "International",
-                "TARGET": "ROBZYL.K1.International"
-            }
-        },
-        {
-            "name": "Brasil",
-            "inherits": "default",
-            "cacheVariables": {
-                "ENABLE_BR_BAND": true,
-                "EDITION_STRING": "Brasil",
-                "TARGET": "ROBZYL.K1.Brasil"
-            }
-        },
-        {
-            "name": "Romania",
-            "inherits": "default",
-            "cacheVariables": {
-                "ENABLE_RO_BAND": true,
-                "EDITION_STRING": "Romania",
-                "TARGET": "ROBZYL.K1.Romania"
-            }
-        },
-        {
-            "name": "Czech",
-            "inherits": "default",
-            "cacheVariables": {
-                "ENABLE_CZ_BAND": true,
-                "EDITION_STRING": "Czech",
-                "TARGET": "ROBZYL.K1.Czech"
-            }
-        },
-        {
-            "name": "Turkey",
-            "inherits": "default",
-            "cacheVariables": {
-                "ENABLE_TU_BAND": true,
-                "EDITION_STRING": "Turkey",
-                "TARGET": "ROBZYL.K1.Turkey"
+                "EDITION_STRING": "NO_COM",
+                "TARGET": "ROBZYL.K1.NO_COM"
             }
         }
     ],
@@ -198,48 +123,16 @@
             "configurePreset": "Dev"
         },
         {
-            "name": "France",
-            "configurePreset": "France"
+            "name": "USB",
+            "configurePreset": "USB"
         },
         {
-            "name": "Kolyan",
-            "configurePreset": "Kolyan"
+            "name": "RS232",
+            "configurePreset": "RS232"
         },
         {
-            "name": "Russia",
-            "configurePreset": "Russia"
-        },
-        {
-            "name": "Poland",
-            "configurePreset": "Poland"
-        },
-        {
-            "name": "SR",
-            "configurePreset": "SR"
-        },
-        {
-            "name": "Finland",
-            "configurePreset": "Finland"
-        },
-        {
-            "name": "International",
-            "configurePreset": "International"
-        },
-        {
-            "name": "Brasil",
-            "configurePreset": "Brasil"
-        },
-        {
-            "name": "Romania",
-            "configurePreset": "Romania"
-        },
-        {
-            "name": "Czech",
-            "configurePreset": "Czech"
-        },
-        {
-            "name": "Turkey",
-            "configurePreset": "Turkey"
+            "name": "NO_COM",
+            "configurePreset": "NO_COM"
         }
     ]
 }

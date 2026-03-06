@@ -45,9 +45,9 @@ fi
 # ---------------------------------------------
 # Validate preset name
 # ---------------------------------------------
-if [[ ! "$PRESET" =~ ^(Dev|France|Kolyan|Russia|Poland|SR|Finland|International|Brasil|Romania|Czech|Turkey|All)$ ]]; then
+if [[ ! "$PRESET" =~ ^(Dev|USB|RS232|NO_COM|All)$ ]]; then
   echo "❌ Unknown preset: '$PRESET'"
-  echo "Valid presets are: Dev France Kolyan Russia Poland SR Finland International Brasil Romania Czech Turkey All"
+  echo "Valid presets are: Dev USB RS232 NO_COM All"
   exit 1
 fi
 
@@ -109,7 +109,7 @@ build_preset() {
 # Handle 'All' preset
 # ---------------------------------------------
 if [[ "$PRESET" == "All" ]]; then
-  PRESETS=(France Kolyan Russia Poland SR Finland International Brasil Romania Czech Turkey)
+  PRESETS=(Dev USB RS232 NO_COM)
   for p in "${PRESETS[@]}"; do
     build_preset "$p"
   done
