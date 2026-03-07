@@ -13,6 +13,9 @@
 #include "driver/py25q16.h"
 #include "version.h"
 //#include "debugging.h"
+#ifdef ENABLE_FEAT_F4HWN_SCREENSHOT
+    #include "screenshot.h"
+#endif
 
 /*	
           /////////////////////////DEBUG//////////////////////////
@@ -2018,8 +2021,8 @@ static void OnKeyDown(uint8_t key) {
                     
                   case 6: // ToggleListeningBW
                   case 7: // ToggleModulation
-                      if (isKeyD || key == KEY_1) {
-                          if (parametersSelectedIndex == 7) {
+                      if (isKeyD || key == KEY_UP) {
+                          if (parametersSelectedIndex == 6) {
                               ToggleListeningBW(isKeyD ? 0 : 1);
                           } else {
                               ToggleModulation();
@@ -3158,6 +3161,9 @@ static void Tick() {
   if (!isListening) {UpdateScan();}
   
   if (gNextTimeslice_display) {
+#ifdef ENABLE_FEAT_F4HWN_SCREENSHOT
+    getScreenShot(true);
+#endif
     //if (isListening || SpectrumMonitor || WaitSpectrum) UpdateListening(); // Kolyan test
     gNextTimeslice_display = 0;
     latestScanListName[0] = '\0';
@@ -3574,9 +3580,9 @@ static bool GetScanListLabel(uint8_t scanListIndex, char* bufferOut) {
     }
 
     if (settings.scanListEnabled[scanListIndex]) {
-      sprintf(bufferOut, "> %d:%-11s*", scanListIndex + 1, nameOrFreq);
+      sprintf(bufferOut, "%d:%-11s*", scanListIndex + 1, nameOrFreq);
     } else {
-        sprintf(bufferOut, " %d:%-11s", scanListIndex + 1, nameOrFreq);
+        sprintf(bufferOut, "%d:%-11s", scanListIndex + 1, nameOrFreq);
     }
 
     return true;

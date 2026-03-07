@@ -1070,20 +1070,20 @@ void UI_DisplayMain(void)
                             if (isMainOnly())
                             {
                                 String[10] = 0;
-                                UI_PrintString(String, 33, 0, line, 8);
+                                UI_PrintString(String, 26, 0, line, 8); //Robzyl was 33
                             }
                             else
                             {
                                 if(activeTxVFO == vfo_num) {
-                                    UI_PrintStringSmallBold(String, 32 + 4, 0, line);
+                                    UI_PrintStringSmallBold(String, 29, 0, line); //Robzyl was 36
                                 }
                                 else
                                 {
-                                    UI_PrintStringSmallNormal(String, 32 + 4, 0, line);     
+                                    UI_PrintStringSmallNormal(String, 29, 0, line); //Robzyl was 36
                                 }
                             }
 #else
-                            UI_PrintStringSmallBold(String, 32 + 4, 0, line);
+                            UI_PrintStringSmallBold(String, 29, 0, line); //Robzyl was 36
 #endif
 
 #ifdef ENABLE_FEAT_F4HWN

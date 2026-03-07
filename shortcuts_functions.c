@@ -8,3 +8,4 @@ UpdateListening();
 
 boot
 UI_DisplayReleaseKeys()
+UI_DisplayMain();
