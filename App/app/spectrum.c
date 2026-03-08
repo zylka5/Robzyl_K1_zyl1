@@ -62,10 +62,9 @@ static uint8_t AUTO_KEYLOCK = AUTOLOCK_OFF;  // case 13
 static uint8_t GlitchMax = 20;               // case 14 
 static bool    SoundBoost = 1;               // case 15 
 static uint8_t PttEmission = 0;              // case 16   
-static bool gCounthistory = 1;               // case 17      
-//ClearHistory                               // case 18      
-//ClearSettings                              // case 19      
-#define PARAMETER_COUNT 20
+//ClearHistory                               // case 17      
+//ClearSettings                              // case 18      
+#define PARAMETER_COUNT 19
 ////////////////////////////////////////////////////////////////////
 
 static bool SettingsLoaded = false;
@@ -98,7 +97,7 @@ static bool Key_1_pressed = 0;
 static uint16_t WaitSpectrum = 0; 
 #define SQUELCH_OFF_DELAY 10;
 //static bool StorePtt_Toggle_Mode = 0;
-static uint8_t ArrowLine = 1;
+static uint8_t ArrowLine = 2;
 static void LoadValidMemoryChannels(void);
 static void ToggleRX(bool on);
 static void NextScanStep();
@@ -798,12 +797,7 @@ static void FillfreqHistory(void)
 
     for (uint16_t i = 0; i < indexFs; i++) {
         if (HFreqs[i] == f) {
-            if (gCounthistory) {
-                if (lastReceivingFreq != f)
-                    HCount[i]++;
-            } else {
-                HCount[i]++;
-            }
+            if (lastReceivingFreq != f) HCount[i]++;
             lastReceivingFreq = f;
             historyListIndex = i;
             return;
@@ -1404,8 +1398,6 @@ static void UpdateCssDetection(void) {
 static void DrawF(uint32_t f) {
     if ((f == 0) || f < 1400000 || f > 130000000) return;
     char freqStr[18];
-    int len = 0;
-    int pos = 0;
     if(isListening) {
             snprintf(freqStr, sizeof(freqStr), "%u.%05u", f / 100000, f % 100000);
     } else {
@@ -1417,8 +1409,6 @@ static void DrawF(uint32_t f) {
     char line1[19] = "";
     char line1b[19] = "";
     char line2[19] = "";
-    char line3[32] = "";
-    
     sprintf(line1, "%s", freqStr);
     sprintf(line1b, "%s %s", freqStr, StringCode);
     
@@ -1448,50 +1438,22 @@ static void DrawF(uint32_t f) {
     } else {
         line2[0] = '\0';
     }
-
-    line3[0] = '\0';
-    pos = 0;
-
-        if (WaitSpectrum > 0 && WaitSpectrum <61000) {
-              len = sprintf(&line3[pos],"End %d ", WaitSpectrum/1000);
-              pos += len;
-        } else if (WaitSpectrum > 61000){
-            len = sprintf(&line3[pos],"End OO "); //locked
-            pos += len;
-        }
-        if (isListening){
-            if (MaxListenTime){
-                  len = sprintf(&line3[pos],"Max %d/%s", spectrumElapsedCount/1000, labels[IndexMaxLT]);
-                  pos += len;
-            } else {
-                  len = sprintf(&line3[pos],"Rx %d ", spectrumElapsedCount/1000); //elapsed receive time
-            }
-      }
-    
-    
+   
     if (classic) {
             if (ShowLines == 2) {
                 UI_DisplayFrequency(line1, 10, 0, 0);  // BIG FREQUENCY
                 GUI_DisplaySmallest(StringCode, 80, 17, false, true);  // CSS субтон
-                if (appMode < 3 )
-                GUI_DisplaySmallest(line2,      34, 17, false, true);  // имя канала / бэнд / список
-                ArrowLine = 3;
+                ArrowLine = 2;
             }
 
             if (ShowLines == 1) {
                 UI_PrintStringSmallbackground(line1b, 1, LCD_WIDTH - 1, 0, 0);  // F + CSS
                 UI_PrintStringSmallbackground(line2,  1, LCD_WIDTH - 1, 1, 0);  // SL or BD + Name
-                GUI_DisplaySmallest(line3, 34,17, false, true);  // таймеры
-                ArrowLine = 3;
-            }
-
-            if (ShowLines == 3) {
               char lastRxFreq[19] = "---";
               if (lastReceivingFreq >= 1400000 && lastReceivingFreq <= 130000000) {
                 FormatFrequency(lastReceivingFreq, lastRxFreq, sizeof(lastRxFreq));
               }
-              UI_PrintStringSmallbackground(lastRxFreq, 1, LCD_WIDTH - 1, 0, 0);
-              GUI_DisplaySmallest(line3, 34, 17, false, true);
+              UI_PrintStringSmallbackground(lastRxFreq, 1, LCD_WIDTH - 1, 2, 0);
               ArrowLine = 3;
             }
     if (Fmax) 
@@ -1512,8 +1474,6 @@ static void DrawF(uint32_t f) {
 #endif
     UI_DisplayFrequency(line1, 10, 2, 0);
     UI_PrintString(line2, 5, LCD_WIDTH - 1, 5, 8);
-    UI_PrintStringSmallbackground(line3,  1, 0, 0, 0);
-
     char rssiText[16];
     sprintf(rssiText, "R:%3d", scanInfo.rssi);
     UI_PrintStringSmallbackground(rssiText, 96, 1, 0, 0);  // x=96, y=0, BSmall
@@ -2061,13 +2021,10 @@ static void OnKeyDown(uint8_t key) {
                                 (PttEmission >= 2 ? 0 : PttEmission + 1) :
                                 (PttEmission <= 0 ? 2 : PttEmission - 1);
                       break;
-                  case 17: // gCounthistory
-                        gCounthistory=!gCounthistory;
-                      break;
-                  case 18: // ClearHistory
+                  case 17: // ClearHistory
                         if (isKeyD) ClearHistory();
                       break;
-                  case 19: 
+                  case 18: 
                         if (isKeyD) ClearSettings();
                       break;
               }
@@ -2168,11 +2125,10 @@ static void OnKeyDown(uint8_t key) {
       } else {
           if (classic){
               ShowLines++;
-              if (ShowLines > 3 || ShowLines < 1) ShowLines = 1;
+              if (ShowLines > 2 || ShowLines < 1) ShowLines = 1;
               char viewText[15];
               const char *viewName = "CLASSIC";
               if (ShowLines == 2) viewName = "BIG";
-              else if (ShowLines == 3) viewName = "LAST RX";
               sprintf(viewText, "VIEW: %s", viewName);
               ShowOSDPopup(viewText);
           }
@@ -3676,14 +3632,11 @@ static void GetParametersText(uint16_t index, char *buffer) {
             else if (PttEmission == 2)
               sprintf(buffer, "PTT: Last Received");
             break;
+
         case 17:
-            if (gCounthistory) sprintf(buffer, "Freq Counting");
-            else sprintf(buffer, "Time Counting");
-            break;
-        case 18:
             sprintf(buffer, "Clear History: >");
             break;
-        case 19:
+        case 18:
             sprintf(buffer, "Reset Default: >");
             break;
         
@@ -3711,14 +3664,8 @@ static void GetHistoryItemText(uint16_t index, char* buffer) {
     if (!f) return;
     snprintf(freqStr, sizeof(freqStr), "%u.%05u", f / 100000, f % 100000);
     RemoveTrailZeros(freqStr);
-    
     uint16_t Hchannel = BOARD_gMR_fetchChannel(f);
-    
-    if (gCounthistory) {
-        dcount = HCount[index];
-    } else {
-        dcount = HCount[index] / 2;
-    }
+    dcount = HCount[index];
     
     // Lecture du nom du canal (Argument 1: Index, Argument 2: Buffer)
     if (Hchannel != 0xFFFF) {
