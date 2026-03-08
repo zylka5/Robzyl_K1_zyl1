@@ -1365,27 +1365,6 @@ static void FormatFrequency(uint32_t f, char *buf, size_t buflen) {
     RemoveTrailZeros(buf);
 }
 
-static void FormatLastReceived(char *buf, size_t buflen) {
-  if (lastReceivingFreq < 1400000 || lastReceivingFreq > 130000000) {
-    snprintf(buf, buflen, "---");
-    return;
-  }
-
-  uint16_t channel = BOARD_gMR_fetchChannel(lastReceivingFreq);
-  if (channel != 0xFFFF) {
-    char savedName[12] = "";
-    SETTINGS_FetchChannelName(savedName,channel );
-    if (savedName[0] != '\0') {
-      snprintf(buf, buflen, "%s", savedName);
-    } else {
-      snprintf(buf, buflen, "CH %u", channel + 1);
-    }
-    return;
-  }
-
-  FormatFrequency(lastReceivingFreq, buf, buflen);
-}
-
 // ------------------ CSS detection ------------------
 static void UpdateCssDetection(void) {
     // Проверяем только когда есть приём сигнала
@@ -1493,9 +1472,9 @@ static void DrawF(uint32_t f) {
     if (classic) {
             if (ShowLines == 2) {
                 UI_DisplayFrequency(line1, 10, 0, 0);  // BIG FREQUENCY
-                GUI_DisplaySmallest(StringCode, 80, 17, false, false);  // CSS субтон
+                GUI_DisplaySmallest(StringCode, 80, 17, false, true);  // CSS субтон
+                if (appMode < 3 )
                 GUI_DisplaySmallest(line2,      34, 17, false, true);  // имя канала / бэнд / список
-                for (uint8_t x = 32; x < 96; x++) {gFrameBuffer[2][x] ^= 0x7F;}
                 ArrowLine = 3;
             }
 
@@ -1507,14 +1486,11 @@ static void DrawF(uint32_t f) {
             }
 
             if (ShowLines == 3) {
-              char lastRx[19] = "";
               char lastRxFreq[19] = "---";
-              FormatLastReceived(lastRx, sizeof(lastRx));
               if (lastReceivingFreq >= 1400000 && lastReceivingFreq <= 130000000) {
                 FormatFrequency(lastReceivingFreq, lastRxFreq, sizeof(lastRxFreq));
               }
               UI_PrintStringSmallbackground(lastRxFreq, 1, LCD_WIDTH - 1, 0, 0);
-              UI_PrintStringSmallbackground(lastRx, 1, LCD_WIDTH - 1, 1, 0);
               GUI_DisplaySmallest(line3, 34, 17, false, true);
               ArrowLine = 3;
             }
