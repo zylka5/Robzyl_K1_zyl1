@@ -86,7 +86,7 @@
                 "ENABLE_DEV": true,
                 "ENABLE_USB": true,
                 "ENABLE_UART": true,
-                "ENABLE_FEAT_F4HWN_SCREENSHOT": false,
+                "ENABLE_FEAT_F4HWN_SCREENSHOT": true,
                 "ENABLE_FMRADIO": false,
                 "EDITION_STRING": "Dev",
                 "TARGET": "ROBZYL.K1.Dev"

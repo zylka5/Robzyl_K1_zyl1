@@ -38,18 +38,10 @@
 
 #define FM_CHANNELS_MAX 48
 
-#ifdef ENABLE_USB
-    #ifdef ENABLE_FEAT_F4HWN_SCREENSHOT
-        #define MR_CHANNELS_MAX 200
-    #else
-        #define MR_CHANNELS_MAX 999
-    #endif
+#ifdef ENABLE_FEAT_F4HWN_SCREENSHOT
+    #define MR_CHANNELS_MAX 500
 #else
-    #ifdef ENABLE_UART
-        #define MR_CHANNELS_MAX 800
-    #else
-        #define MR_CHANNELS_MAX 999
-    #endif
+    #define MR_CHANNELS_MAX 999
 #endif
 
 #define MR_CHANNELS_LIST 20

@@ -14,7 +14,7 @@
 #include "version.h"
 
 #ifdef ENABLE_DEV
-    #include "debugging.h"
+    //#include "debugging.h"
 #endif
 
 #ifdef ENABLE_FEAT_F4HWN_SCREENSHOT
@@ -75,6 +75,7 @@ static bool SettingsLoaded = false;
 uint8_t  gKeylockCountdown = 0;
 bool     gIsKeylocked = false;
 static uint16_t osdPopupTimer = 0;
+static uint16_t ScanIndex = 0;
 static uint32_t Fmax = 0;
 static uint32_t spectrumElapsedCount = 0;
 static uint32_t SpectrumPauseCount = 0;
@@ -856,7 +857,8 @@ static void ResetScanStats() {
 
 static bool InitScan() {
     ResetScanStats();
-    scanInfo.i = 0;
+    scanInfo.i = 0; //0 to MR_CHANNEL_LAST
+    ScanIndex = 0;  //0 to scanChannelsCount
     peak.i = 0; // To check
     peak.f = 0; // To check
     
@@ -987,32 +989,29 @@ static void Measure() {
     uint16_t count = GetStepsCount() + 1;
     if (count == 0) return;
     uint16_t i = scanInfo.i;
-    if (i >= scanChannelsCount) i = scanChannelsCount - 1;
+    if (i >= MR_CHANNEL_LAST) i = MR_CHANNEL_LAST - 1;
     if (count > 128) {
-        uint16_t pixel = (uint32_t)i * 128 / count;
+        uint16_t pixel = (uint32_t)ScanIndex * 128 / count;
         if (pixel >= 128) pixel = 127;
         rssiHistory[pixel] = rssi;
-        uint16_t next = (pixel + 1) % 128;
-        rssiHistory[next] = 0;
-        next = (next + 1) % 128;
-        rssiHistory[next] = 0;
+        if(++pixel < 128) rssiHistory[pixel] = 0; //2 blank pixels
+        if(++pixel < 128) rssiHistory[pixel] = 0;
     } else {
         uint16_t base = 128 / count;
         uint16_t rem  = 128 % count;
-        uint16_t startIndex = i * base + (i < rem ? i : rem);
-        uint16_t width      = base + (i < rem ? 1 : 0);
+        uint16_t startIndex = ScanIndex * base + (ScanIndex < rem ? ScanIndex : rem);
+        uint16_t width      = base + (ScanIndex < rem ? 1 : 0);
         uint16_t endIndex   = startIndex + width;
-        if (endIndex > 128) endIndex = 128;
-        for (j = startIndex; j < endIndex; ++j) {
-            rssiHistory[j] = rssi;
-        }
-        uint16_t nextBarEnd = endIndex + base;
-        if (nextBarEnd > 128) nextBarEnd = 128;
-        for (j = endIndex; j < nextBarEnd; ++j) {
-            rssiHistory[j] = 0;
-        }
+
+          uint16_t maxEnd = endIndex;
+          if (maxEnd > 128) maxEnd = 128;
+          for (j = startIndex; j < maxEnd; ++j) { rssiHistory[j] = rssi; }
+
+          uint16_t zeroEnd = endIndex + width;
+        if (zeroEnd > 128) zeroEnd = 128;
+        for (j = endIndex; j < zeroEnd; ++j) { rssiHistory[j] = 0; }
    }
-   char str[64] = "";sprintf(str, "Count %d i %d scanInfo.f %d \r\n",scanChannelsCount, i, scanInfo.f );LogUart(str);
+   //char str[64] = "";sprintf(str, "Count %d i %d scanInfo.f %d \r\n",scanChannelsCount, i, scanInfo.f );LogUart(str);
 }
 
 int Rssi2DBm(const uint16_t rssi)
@@ -1299,7 +1298,7 @@ switch(SpectrumMonitor) {
       len = sprintf(&String[pos],"A%+d ", afcVal);
       pos += len;
   } else {
-      len = sprintf(&String[pos], "ST %s", scanStepNames[settings.scanStepIndex]);
+      len = sprintf(&String[pos], "ST%s", scanStepNames[settings.scanStepIndex]);
       pos += len;
     }
    
@@ -1527,6 +1526,7 @@ static void NextScanStep() {
             scanInfo.f = ScanFrequencies[scanInfo.i];
             if (scanInfo.f ) break;
         }
+        ScanIndex++;
         f_linear = scanInfo.f;
     }
     else {
@@ -1894,10 +1894,8 @@ static void OnKeyDown(uint8_t key) {
                   
                   case 3: // gScanRange
                   case 4:
-                      if (!isKeyD) {
                           appMode = SCAN_RANGE_MODE;
                           FreqInput();
-                      }
                       break;
 
                   case 5: // UpdateScanStep
@@ -2878,7 +2876,7 @@ static void UpdateScan() {
       NextHistoryScanStep();
       return;
   }
-  if (scanInfo.i < GetStepsCount()) {
+  if (ScanIndex < GetStepsCount()) {
     NextScanStep();
     return;
   }
