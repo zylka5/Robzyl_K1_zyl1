@@ -189,7 +189,7 @@ char freqInputString[11];
 static uint8_t nextBandToScanIndex = 0;
 static void LookupChannelModulation();
 uint16_t BOARD_gMR_fetchChannel(const uint32_t freq);
-static uint8_t validScanListIndices[MAX_VALID_SCANLISTS]; // stocke les index valides
+static uint8_t validScanListIndices[MR_CHANNELS_LIST]; // stocke les index valides
 #ifdef ENABLE_SPECTRUM_LINES
 static void MyDrawShortHLine(uint8_t y, uint8_t x_start, uint8_t x_end, uint8_t step, bool white); //ПРОСТОЙ РЕЖИМ ЛИНИИ
 static void MyDrawVLine(uint8_t x, uint8_t y_start, uint8_t y_end, uint8_t step); //ПРОСТОЙ РЕЖИМ ЛИНИИ
@@ -1782,7 +1782,7 @@ static void OnKeyDown(uint8_t key) {
                 break;
 				        
             case KEY_MENU:
-                if (scanListSelectedIndex < MAX_VALID_SCANLISTS) {
+                if (scanListSelectedIndex < MR_CHANNELS_LIST) {
                     ToggleScanList(validScanListIndices[scanListSelectedIndex], 1);
                     SetState(SPECTRUM);
                     ResetModifiers();
@@ -3156,7 +3156,7 @@ static void LoadActiveScanFrequencies(void)
                 }
             }
             else {ScanFrequencies[ch] = 0;} //Not valid
-        char str[64] = "";sprintf(str, "EN %d CH %d F %d SF %d\r\n",settings.scanListEnabled[cache.scanlist-1], ch, freq,ScanFrequencies[ch]);LogUart(str);
+        //char str[64] = "";sprintf(str, "EN %d CH %d SL %d SF %d\r\n",settings.scanListEnabled[cache.scanlist-1], ch, cache.scanlist-1,ScanFrequencies[ch]);LogUart(str);
     }
 }
 
@@ -3237,7 +3237,7 @@ void LoadSettings()
   #ifndef ENABLE_DEV
   if(!IsVersionMatching()) {ClearSettings();}
   #endif
-  for (int i = 0; i < MAX_VALID_SCANLISTS; i++) {
+  for (int i = 0; i < MR_CHANNELS_LIST; i++) {
     settings.scanListEnabled[i] = (eepromData.scanListFlags >> i) & 0x01;
   }
   settings.rssiTriggerLevelUp = eepromData.Trigger;
@@ -3288,7 +3288,7 @@ SettingsLoaded = true;
 static void SaveSettings() 
 {
   SettingsEEPROM  eepromData  = {0};
-  for (int i = 0; i < MAX_VALID_SCANLISTS; i++) {
+  for (int i = 0; i < MR_CHANNELS_LIST; i++) {
     if (settings.scanListEnabled[i]) eepromData.scanListFlags |= (1 << i);
   }
   eepromData.Trigger = settings.rssiTriggerLevelUp;
@@ -3346,7 +3346,7 @@ static void ClearHistory()
 
 void ClearSettings() 
 {
-  for (int i = 1; i < MAX_VALID_SCANLISTS; i++) {settings.scanListEnabled[i] = 0;}
+  for (int i = 1; i < MR_CHANNELS_LIST; i++) {settings.scanListEnabled[i] = 0;}
   settings.scanListEnabled[0] = 1;
   settings.rssiTriggerLevelUp = 5;
   settings.listenBw = 1;
@@ -3435,7 +3435,7 @@ static bool GetScanListLabel(uint8_t scanListIndex, char* bufferOut) {
 static void BuildValidScanListIndices() {
     uint8_t ScanListCount = 0;
     char tempName[17];
-    for (uint8_t i = 0; i < MAX_VALID_SCANLISTS; i++) {
+    for (uint8_t i = 0; i < MR_CHANNELS_LIST; i++) {
 
         if (GetScanListLabel(i, tempName)) {
             validScanListIndices[ScanListCount++] = i;

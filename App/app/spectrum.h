@@ -158,16 +158,6 @@ typedef enum ScanList {
   S_SCAN_LIST_ALL
 } ScanList;
 
-#ifdef ENABLE_FLASH_BAND
-typedef struct __attribute__((packed)) bandparameters { 
-    char BandName[12];        // 12 bytes
-    uint32_t Startfrequency;  // 4 bytes
-    uint32_t Stopfrequency;   // 4 bytes
-    uint8_t scanStep;         // 1 byte (Vérifiez si ScanStep est bien uint8_t)
-    uint8_t modulationType;   // 1 byte
-    uint8_t padding[10];      // 10 bytes pour atteindre un total de 32
-} bandparameters;
-#else
 typedef struct bandparameters { 
   char BandName[12];
   uint32_t Startfrequency; // Start frequency in MHz /100
@@ -175,10 +165,6 @@ typedef struct bandparameters {
   ScanStep scanStep;
   ModulationMode_t modulationType;
 } bandparameters;
-#endif
-
-#define MAX_VALID_SCANLISTS 10
-#define MAX_BANDS 51
 
 typedef struct SpectrumSettings {
   uint32_t frequencyChangeStep;  
@@ -192,8 +178,8 @@ typedef struct SpectrumSettings {
   int16_t dbMax;  
   ModulationMode_t modulationType;
   int scanList;
-  bool scanListEnabled[MAX_VALID_SCANLISTS];
-  bool bandEnabled[MAX_BANDS];
+  bool scanListEnabled[MR_CHANNELS_LIST];
+  bool bandEnabled[64];
 } SpectrumSettings;
 
 typedef struct KeyboardState{

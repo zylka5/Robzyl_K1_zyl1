@@ -16,6 +16,8 @@
   S_STEP_100kHz,
   S_STEP_500kHz, */
 
+#define MAX_BANDS 51
+
 #ifdef ENABLE_FULL_BAND
 static const bandparameters BParams[MAX_BANDS] = {
     /* --- HF / LOW BANDS (Long distance & Propagation) --- */
