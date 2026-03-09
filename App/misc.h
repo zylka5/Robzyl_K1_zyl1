@@ -42,7 +42,7 @@
     #ifdef ENABLE_FEAT_F4HWN_SCREENSHOT
         #define MR_CHANNELS_MAX 200
     #else
-        #define MR_CHANNELS_MAX 600
+        #define MR_CHANNELS_MAX 999
     #endif
 #else
     #ifdef ENABLE_UART
