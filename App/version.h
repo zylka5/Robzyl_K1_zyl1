@@ -1,7 +1,7 @@
 #ifndef VERSION_H
 #define VERSION_H
 
-#define APP_VERSION 425
+#define APP_VERSION 432
 
 extern const char Version[];
 extern const char UART_Version[];

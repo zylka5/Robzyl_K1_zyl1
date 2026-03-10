@@ -29,6 +29,8 @@
 #define NoisLvl 45
 #define NoiseHysteresis 15
 
+static volatile bool gSpectrumChangeRequested = false;
+static volatile uint8_t gRequestedSpectrumState = 0;
 bool gComeBack = 0;
 static uint8_t Spectrum_state = 1; 
 static uint16_t historyListIndex = 0;
@@ -2201,14 +2203,15 @@ static void OnKeyDown(uint8_t key) {
         }
     break;
   
-/* next mode poprawione */ //СМЕНА РЕЖИМОВ
-     case KEY_6:
+     case KEY_6: // next mode
         // 0 = FR, 1 = SL, 2 = BD, 3 = RG
         if (++Spectrum_state > 3) {Spectrum_state = 0;}
         char sText[32];
         const char* s[] = {"FREQ", "S LIST", "BAND", "RANGE"};
         sprintf(sText, "MODE: %s", s[Spectrum_state]);
         ShowOSDPopup(sText);
+        gRequestedSpectrumState = Spectrum_state;
+        gSpectrumChangeRequested = true;
         isInitialized = false;
         spectrumElapsedCount = 0;
         WaitSpectrum = 0;
@@ -2217,7 +2220,6 @@ static void OnKeyDown(uint8_t key) {
         SpectrumPauseCount = 0;
         newScanStart = true;
         ToggleRX(false);
-        APP_RunSpectrum();
         break;
   
     case KEY_SIDE1:
@@ -3156,11 +3158,21 @@ void APP_RunSpectrum(void)
         isInitialized = true;
         historyListActive = false;
         while (isInitialized) {Tick();}
-        RestoreRegisters();
-        free(ScanFrequencies);
-        free(HFreqs);
-        free(HCount);
-        free(HBlacklisted);
+
+        if (gSpectrumChangeRequested) {
+            Spectrum_state = gRequestedSpectrumState;
+            gSpectrumChangeRequested = false;
+            RestoreRegisters(); 
+            continue;
+        } else {
+            RestoreRegisters();
+            free(ScanFrequencies);
+            free(HFreqs);
+            free(HCount);
+            free(HBlacklisted);
+            break;
+        }
+
         break;
     } 
 }
