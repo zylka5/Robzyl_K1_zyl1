@@ -24,7 +24,7 @@
 */
 
 #define MAX_VISIBLE_LINES 6
-#define HISTORY_SIZE 50
+#define HISTORY_SIZE 200
 #define NoisLvl 45
 #define NoiseHysteresis 15
 
@@ -149,7 +149,8 @@ static uint8_t bl;
 static State currentState = SPECTRUM, previousState = SPECTRUM;
 static PeakInfo peak;
 static ScanInfo scanInfo;
-static char     latestScanListName[12];
+static char latestScanListName[12];
+static bool refreshScanListName = true;
 static bool IsBlacklisted(uint32_t f);
 
 /***************************BIG RAM******************************************/
@@ -3154,17 +3155,17 @@ static void LoadActiveScanFrequencies(void)
 }
 
 static void ToggleScanList(int scanListNumber, int single )
-  {
-    if (appMode == SCAN_BAND_MODE)
-      {
+{
+    if (appMode == SCAN_BAND_MODE) {
       if (single) memset(settings.bandEnabled, 0, sizeof(settings.bandEnabled));
         else settings.bandEnabled[scanListNumber-1] = !settings.bandEnabled[scanListNumber-1];
-      }
+    }
     if (appMode == CHANNEL_MODE) {
         if (single) {memset(settings.scanListEnabled, 0, sizeof(settings.scanListEnabled));}
         settings.scanListEnabled[scanListNumber] = !settings.scanListEnabled[scanListNumber];
-      }
-  }
+        refreshScanListName = true;
+    }
+}
 #ifndef ENABLE_DEV
 bool IsVersionMatching(void) {
     uint16_t stored,app_version;
@@ -3677,16 +3678,19 @@ static void RenderList(const char* title, uint16_t numItems, uint16_t selectedIn
 
 // Fonction pour afficher le menu ScanList
 static void RenderScanListSelect() {
-    //BuildValidScanListIndices(); 
-  uint8_t selectedCount = 0;
-  for (uint8_t i = 0; i < validScanListCount; i++) {
-    if (settings.scanListEnabled[validScanListIndices[i]]) {
-      selectedCount++;
+    if (refreshScanListName) {
+        BuildValidScanListIndices(); 
+        refreshScanListName = false;
     }
-  }
-  char title[24];
-  snprintf(title, sizeof(title), "SCANLISTS: %u/%u", selectedCount, validScanListCount);
-  RenderList(title, validScanListCount,scanListSelectedIndex, scanListScrollOffset, GetFilteredScanListText);
+    uint8_t selectedCount = 0;
+    for (uint8_t i = 0; i < validScanListCount; i++) {
+        if (settings.scanListEnabled[validScanListIndices[i]]) {
+            selectedCount++;
+        }
+    }
+    char title[24];
+    snprintf(title, sizeof(title), "SCANLISTS: %u/%u", selectedCount, validScanListCount);
+    RenderList(title, validScanListCount,scanListSelectedIndex, scanListScrollOffset, GetFilteredScanListText);
 }
 
 static void RenderParametersSelect() {
