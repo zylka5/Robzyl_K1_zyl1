@@ -12,10 +12,7 @@
 #include "ui/main.h"
 #include "driver/py25q16.h"
 #include "version.h"
-
-#ifdef ENABLE_DEV
-    #include "debugging.h"
-#endif
+//#include "debugging.h"
 
 #ifdef ENABLE_FEAT_F4HWN_SCREENSHOT
     #include "screenshot.h"
@@ -26,12 +23,8 @@
           char str[64] = "";sprintf(str, "%d\r\n", i );LogUart(str);
 */
 
-#ifdef ENABLE_SCREENSHOT
-  #include "screenshot.h"
-#endif
-
 #define MAX_VISIBLE_LINES 6
-#define HISTORY_SIZE 200
+#define HISTORY_SIZE 50
 #define NoisLvl 45
 #define NoiseHysteresis 15
 
@@ -908,7 +901,7 @@ static void ResetModifiers() {
   for (int i = 0; i < 128; ++i) {
     if (rssiHistory[i] == RSSI_MAX_VALUE) rssiHistory[i] = 0;
   }
-  if(appMode==CHANNEL_MODE){LoadActiveScanFrequencies();}
+  LoadActiveScanFrequencies();
   RelaunchScan();
 }
 
@@ -3141,7 +3134,7 @@ uint16_t RADIO_ValidMemoryChannelsCount(bool bCheckScanList, uint8_t CurrentScan
 }
 
 static void LoadActiveScanFrequencies(void)
-{
+{   if(appMode!=CHANNEL_MODE)return;
     memset(ScanFrequencies,0,sizeof(ScanFrequencies));
     scanChannelsCount = 0;
     ChannelAttributes_t cache;
@@ -3151,7 +3144,7 @@ static void LoadActiveScanFrequencies(void)
         uint32_t freq = FetchChannelFrequency(ch);
         if (freq) {
             if (settings.scanListEnabled[cache.scanlist-1])
-                {   ScanFrequencies[ch] = freq; // 32-bit storage
+                {   ScanFrequencies[ch] = freq;
                     scanChannelsCount++;
                 }
             }
@@ -3684,7 +3677,7 @@ static void RenderList(const char* title, uint16_t numItems, uint16_t selectedIn
 
 // Fonction pour afficher le menu ScanList
 static void RenderScanListSelect() {
-    BuildValidScanListIndices(); 
+    //BuildValidScanListIndices(); 
   uint8_t selectedCount = 0;
   for (uint8_t i = 0; i < validScanListCount; i++) {
     if (settings.scanListEnabled[validScanListIndices[i]]) {

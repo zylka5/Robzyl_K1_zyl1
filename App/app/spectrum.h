@@ -178,7 +178,7 @@ typedef struct SpectrumSettings {
   int16_t dbMax;  
   ModulationMode_t modulationType;
   int scanList;
-  bool scanListEnabled[MR_CHANNELS_LIST];
+  bool scanListEnabled[MR_CHANNELS_LIST+1];
   bool bandEnabled[64];
 } SpectrumSettings;
 
