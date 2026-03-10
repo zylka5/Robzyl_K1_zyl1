@@ -137,7 +137,7 @@ void UI_PrintStringSmallbackground(const char *pString, uint8_t Start, uint8_t E
     const unsigned int space_width = 4;
 
     size_t start_pos = (size_t)Start;
-    size_t end_pos   = (size_t)End;
+    //size_t end_pos   = (size_t)End;
 
     //if (end_pos > start_pos) start_pos += (((end_pos - start_pos) - (Length * (char_width + spacing))) + 1) / 2;
 

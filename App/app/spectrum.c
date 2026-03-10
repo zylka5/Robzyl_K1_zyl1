@@ -13,7 +13,7 @@
 #include "driver/py25q16.h"
 #include "version.h"
 #include <stdlib.h> // malloc/free
-//#include "debugging.h"
+#include "debugging.h"
 
 #ifdef ENABLE_FEAT_F4HWN_SCREENSHOT
     #include "screenshot.h"
@@ -1541,7 +1541,6 @@ static void NextScanStep() {
             scanInfo.f = ScanFrequencies[scanInfo.i];
             if (scanInfo.f ) break;
         }
-        ScanIndex++;
         f_linear = scanInfo.f;
     }
     else {
@@ -1551,8 +1550,10 @@ static void NextScanStep() {
             scanInfo.f = gScanRangeStart + (scanInfo.i * scanInfo.scanStep);
         }
         f_linear = gScanRangeStart + (scanInfo.i * scanInfo.scanStep);
+//char str[64] = "";sprintf(str, "%d %d\r\n", f_linear,scanInfo.f );LogUart(str);
         scanInfo.i++;
     }
+ScanIndex++;
 }
 
 static void CompactHistory(void) {
