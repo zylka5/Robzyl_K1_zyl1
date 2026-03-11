@@ -106,6 +106,10 @@ static void RenderScanListSelect();
 static void RenderParametersSelect();
 static void RenderRAMView();
 static void OnKeyDownRAMView(uint8_t key);
+static void RenderMemBuffers();
+static void OnKeyDownMemBuffers(uint8_t key);
+static void RenderMemViewer();
+static void OnKeyDownMemViewer(uint8_t key);
 static void UpdateScan();
 static uint8_t bandListSelectedIndex = 0;
 static int bandListScrollOffset = 0;
@@ -117,6 +121,18 @@ static uint8_t scanListScrollOffset = 0;
 static uint8_t parametersSelectedIndex = 0;
 static uint8_t parametersScrollOffset = 0;
 static uint8_t validScanListCount = 0;
+static uint8_t memBufSelectedIndex = 0;   /* selected entry in MEM_BUFFERS */
+static uint8_t memBufScrollOffset  = 0;   /* scroll offset for MEM_BUFFERS list */
+static uint16_t memViewOffset      = 0;   /* byte offset into buffer in MEM_VIEWER */
+
+typedef enum {
+    MEM_VIEW_HEX_ASCII = 0, /* wide HEX+ASCII, 6 bytes per row (default) */
+    MEM_VIEW_BIN,           /* BIN detail for one byte                    */
+    MEM_VIEW_INFO,          /* buffer metadata / INFO screen              */
+    MEM_VIEW_MODE_COUNT
+} MemViewMode_t;
+
+static MemViewMode_t memViewMode = MEM_VIEW_HEX_ASCII;
 static KeyboardState kbd = {KEY_INVALID, KEY_INVALID, 0,0};
 struct FrequencyBandInfo {
     uint32_t lower;
@@ -2761,6 +2777,338 @@ static void RenderStill() {
 }
 
 
+/* ---- buffer watch registry -------------------------------------------- */
+
+/*
+ * RamWatchEntry_t — describes one monitored buffer for the memory diagnostics
+ * UI (MEM_BUFFERS / MEM_VIEWER screens).
+ *
+ * For static arrays  : base = array start, dyn = NULL.
+ * For dynamic buffers: base = NULL, dyn = &the_pointer_variable
+ *   so the viewer can dereference at render time and handle NULL safely.
+ *
+ * elem_count and elem_size are informational (shown in INFO mode); set to 0
+ * when not applicable.
+ */
+typedef struct {
+    const char  *name;        /* display name (up to ~9 chars)            */
+    const void  *base;        /* static: data ptr; dynamic: NULL          */
+    const void **dyn;         /* dynamic: &ptr_var; static: NULL          */
+    uint32_t     bytes;       /* total size in bytes                      */
+    uint16_t     elem_count;  /* number of elements (0 = n/a)             */
+    uint8_t      elem_size;   /* size of one element in bytes (0 = n/a)   */
+    const char  *section;     /* ".bss", "heap", ".data" …                */
+} RamWatchEntry_t;
+
+/* Forward helpers */
+static const uint8_t *RamWatch_GetPtr(uint8_t idx);
+static uint32_t       RamWatch_GetSize(uint8_t idx);
+
+/* The watched-buffer table. */
+static const RamWatchEntry_t ram_watch[] = {
+    /* name        base             dyn                            bytes                              count        esize  section */
+    { "rssiHist",  rssiHistory,     NULL,                          sizeof(rssiHistory),               128,         1,     ".bss"  },
+    { "settings",  &settings,       NULL,                          sizeof(settings),                  1,           sizeof(settings), ".bss" },
+    { "frameBuf",  gFrameBuffer,    NULL,                          sizeof(gFrameBuffer),              7,           128,   ".bss"  },
+    { "ScanFreq",  NULL,            (const void **)&ScanFrequencies,
+                                                                    (MR_CHANNEL_LAST + 1)*sizeof(uint32_t), (MR_CHANNEL_LAST + 1), 4, "heap" },
+    { "HFreqs",    NULL,            (const void **)&HFreqs,        HISTORY_SIZE*sizeof(uint32_t),     HISTORY_SIZE, 4,   "heap"  },
+    { "HCount",    NULL,            (const void **)&HCount,        HISTORY_SIZE*sizeof(uint8_t),      HISTORY_SIZE, 1,   "heap"  },
+    { "HBlkList",  NULL,            (const void **)&HBlacklisted,  HISTORY_SIZE*sizeof(bool),         HISTORY_SIZE, 1,   "heap"  },
+};
+#define RAM_WATCH_COUNT ((uint8_t)(sizeof(ram_watch) / sizeof(ram_watch[0])))
+
+static const uint8_t *RamWatch_GetPtr(uint8_t idx)
+{
+    if (idx >= RAM_WATCH_COUNT) return NULL;
+    if (ram_watch[idx].dyn != NULL)
+        return (const uint8_t *)*ram_watch[idx].dyn;
+    return (const uint8_t *)ram_watch[idx].base;
+}
+
+static uint32_t RamWatch_GetSize(uint8_t idx)
+{
+    if (idx >= RAM_WATCH_COUNT) return 0u;
+    return ram_watch[idx].bytes;
+}
+
+/* ---- MEM_BUFFERS screen ----------------------------------------------- */
+
+#define MEM_BUF_ROWS 6   /* visible buffer entries per screen */
+
+static void RenderMemBuffers(void)
+{
+    char buf[32];
+
+    /* inverted header */
+    for (uint8_t px = 0; px < 128; ++px)
+        for (uint8_t py = 0; py < 7; ++py)
+            PutPixel(px, py, true);
+    GUI_DisplaySmallest("MEM BUFS MENU=view", 1, 1, false, false);
+
+    /* clamp scroll */
+    if (memBufSelectedIndex >= RAM_WATCH_COUNT)
+        memBufSelectedIndex = RAM_WATCH_COUNT - 1u;
+    if (memBufSelectedIndex < memBufScrollOffset)
+        memBufScrollOffset = memBufSelectedIndex;
+    if (memBufSelectedIndex >= memBufScrollOffset + MEM_BUF_ROWS)
+        memBufScrollOffset = memBufSelectedIndex - MEM_BUF_ROWS + 1u;
+
+    uint8_t y = 9;
+    for (uint8_t i = 0; i < MEM_BUF_ROWS; ++i) {
+        uint8_t idx = memBufScrollOffset + i;
+        if (idx >= RAM_WATCH_COUNT) break;
+
+        const uint8_t *ptr  = RamWatch_GetPtr(idx);
+        uint32_t       size = RamWatch_GetSize(idx);
+
+        if (ptr != NULL) {
+            snprintf(buf, sizeof(buf), "%-9s%4lu %s",
+                     ram_watch[idx].name, (unsigned long)size,
+                     ram_watch[idx].section);
+        } else {
+            snprintf(buf, sizeof(buf), "%-9s  -- %s",
+                     ram_watch[idx].name, ram_watch[idx].section);
+        }
+
+        bool selected = (idx == memBufSelectedIndex);
+        if (selected) {
+            for (uint8_t px = 0; px < 128; ++px)
+                for (uint8_t py = y - 1; py < y + 7; ++py)
+                    PutPixel(px, py, true);
+            GUI_DisplaySmallest(buf, 1, y, false, false);
+        } else {
+            GUI_DisplaySmallest(buf, 1, y, false, true);
+        }
+        y += 8;
+    }
+}
+
+static void OnKeyDownMemBuffers(uint8_t key)
+{
+    BACKLIGHT_TurnOn();
+    switch (key) {
+    case KEY_UP:
+        if (memBufSelectedIndex > 0)
+            --memBufSelectedIndex;
+        else
+            memBufSelectedIndex = RAM_WATCH_COUNT - 1u;
+        break;
+    case KEY_DOWN:
+        if (memBufSelectedIndex < RAM_WATCH_COUNT - 1u)
+            ++memBufSelectedIndex;
+        else
+            memBufSelectedIndex = 0;
+        break;
+    case KEY_MENU:
+        /* Enter viewer for the selected buffer (only if data is available). */
+        memViewOffset = 0;
+        memViewMode   = MEM_VIEW_HEX_ASCII;
+        SetState(MEM_VIEWER);
+        break;
+    case KEY_EXIT:
+        SetState(RAM_VIEW);
+        break;
+    default:
+        break;
+    }
+}
+
+/* ---- MEM_VIEWER screen ------------------------------------------------- */
+
+/*
+ * Three display modes, cycled with MENU:
+ *
+ *   HEX+ASCII  (default) — wide 6-byte rows:
+ *     OOOO: HH HH HH HH HH HH  AAAAAA
+ *     ASCII: printable 0x20..0x7E shown as-is, others as '.'
+ *
+ *   BIN detail — one byte at a time:
+ *     ofs, hex, dec, ascii char, binary digits
+ *
+ *   INFO — buffer metadata:
+ *     name, section, size, elem count×size, pointer address, alloc state
+ *
+ * KEY_UP/DOWN : scroll (6 bytes in HEX+ASCII, 1 byte in BIN)
+ * KEY_MENU    : cycle HEX+ASCII → BIN → INFO → HEX+ASCII
+ * KEY_EXIT    : return to MEM_BUFFERS
+ */
+#define MEM_VIEW_COLS  6   /* bytes per hex+ascii row */
+#define MEM_VIEW_ROWS  6   /* visible rows in hex+ascii mode */
+
+static void RenderMemViewer(void)
+{
+    char buf[40];
+    uint8_t y = 9;
+
+    const uint8_t           *data = RamWatch_GetPtr(memBufSelectedIndex);
+    const RamWatchEntry_t   *ent  = &ram_watch[memBufSelectedIndex];
+    uint32_t                 size = RamWatch_GetSize(memBufSelectedIndex);
+
+    /* ---- inverted header ---- */
+    for (uint8_t px = 0; px < 128; ++px)
+        for (uint8_t py = 0; py < 7; ++py)
+            PutPixel(px, py, true);
+
+    const char *mode_str =
+        (memViewMode == MEM_VIEW_BIN)  ? "BIN"  :
+        (memViewMode == MEM_VIEW_INFO) ? "INFO" : "HEX+ASC";
+    snprintf(buf, sizeof(buf), "%.9s %s", ent->name, mode_str);
+    GUI_DisplaySmallest(buf, 1, 1, false, false);
+
+    /* ---- NULL / unallocated guard ---- */
+    if (data == NULL || size == 0u) {
+        GUI_DisplaySmallest("not allocated", 1, y, false, true); y += 8;
+        GUI_DisplaySmallest("MENU=mode EXIT=back", 1, y, false, true);
+        return;
+    }
+
+    /* clamp offset */
+    if (memViewOffset >= (uint16_t)size)
+        memViewOffset = (uint16_t)(size - 1u);
+
+    /* ---- HEX+ASCII mode ---- */
+    if (memViewMode == MEM_VIEW_HEX_ASCII) {
+        for (uint8_t row = 0; row < MEM_VIEW_ROWS; ++row) {
+            uint16_t off = memViewOffset + (uint16_t)(row * MEM_VIEW_COLS);
+            if (off >= (uint16_t)size) break;
+
+            /* Build "OOOO: HH HH HH HH HH HH  AAAAAA" */
+            uint8_t n = (uint8_t)snprintf(buf, sizeof(buf), "%04X:", (unsigned)off);
+            if (n >= sizeof(buf)) n = (uint8_t)(sizeof(buf) - 1u);
+            uint8_t ascii_col[MEM_VIEW_COLS];
+            uint8_t valid = 0;
+            for (uint8_t col = 0; col < MEM_VIEW_COLS; ++col) {
+                uint16_t bo = off + col;
+                if (n + 4u < sizeof(buf)) {
+                    if (bo < (uint16_t)size) {
+                        uint8_t b = data[bo];
+                        int r = snprintf(buf + n, sizeof(buf) - n, " %02X", (unsigned)b);
+                        if (r > 0) n = (uint8_t)(n + (uint8_t)r);
+                        ascii_col[col] = (b >= 0x20u && b <= 0x7Eu) ? b : (uint8_t)'.';
+                        ++valid;
+                    } else {
+                        buf[n++] = ' '; buf[n++] = ' '; buf[n++] = ' ';
+                        ascii_col[col] = ' ';
+                    }
+                }
+            }
+            /* two-space separator then ASCII */
+            if (n + 2u < sizeof(buf)) {
+                buf[n++] = ' '; buf[n++] = ' ';
+            }
+            for (uint8_t col = 0; col < valid && n + 1u < sizeof(buf); ++col)
+                buf[n++] = (char)ascii_col[col];
+            buf[n] = '\0';
+
+            GUI_DisplaySmallest(buf, 1, y, false, true);
+            y += 8;
+        }
+
+    /* ---- BIN detail mode ---- */
+    } else if (memViewMode == MEM_VIEW_BIN) {
+        uint8_t bv = data[memViewOffset];
+
+        snprintf(buf, sizeof(buf), "ofs:%u", (unsigned)memViewOffset);
+        GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
+
+        snprintf(buf, sizeof(buf), "hex:%02X  dec:%u", (unsigned)bv, (unsigned)bv);
+        GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
+
+        char ac = (bv >= 0x20u && bv <= 0x7Eu) ? (char)bv : '.';
+        snprintf(buf, sizeof(buf), "asc:%c", ac);
+        GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
+
+        snprintf(buf, sizeof(buf), "bin:%u%u%u%u %u%u%u%u",
+                 (bv >> 7) & 1, (bv >> 6) & 1,
+                 (bv >> 5) & 1, (bv >> 4) & 1,
+                 (bv >> 3) & 1, (bv >> 2) & 1,
+                 (bv >> 1) & 1, (bv >> 0) & 1);
+        GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
+
+        snprintf(buf, sizeof(buf), "%u/%lu B", (unsigned)memViewOffset,
+                 (unsigned long)size);
+        GUI_DisplaySmallest(buf, 1, y, false, true);
+
+    /* ---- INFO mode ---- */
+    } else {
+        snprintf(buf, sizeof(buf), "src:%s", ent->section);
+        GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
+
+        snprintf(buf, sizeof(buf), "size:%lu B", (unsigned long)size);
+        GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
+
+        if (ent->elem_count > 0u && ent->elem_size > 0u) {
+            snprintf(buf, sizeof(buf), "elem:%ux%u",
+                     (unsigned)ent->elem_count, (unsigned)ent->elem_size);
+            GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
+        }
+
+        /* show pointer as hex address */
+        snprintf(buf, sizeof(buf), "ptr:%08lX",
+                 (unsigned long)(uintptr_t)data);
+        GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
+
+        snprintf(buf, sizeof(buf), "state:%s",
+                 ent->dyn ? ((*ent->dyn != NULL) ? "alloc" : "empty") : "static");
+        GUI_DisplaySmallest(buf, 1, y, false, true);
+    }
+}
+
+static void OnKeyDownMemViewer(uint8_t key)
+{
+    BACKLIGHT_TurnOn();
+    const uint32_t size = RamWatch_GetSize(memBufSelectedIndex);
+
+    if (size == 0u || RamWatch_GetPtr(memBufSelectedIndex) == NULL) {
+        switch (key) {
+        case KEY_MENU:
+            memViewMode = (MemViewMode_t)((memViewMode + 1u) % MEM_VIEW_MODE_COUNT);
+            break;
+        case KEY_EXIT:
+            SetState(MEM_BUFFERS);
+            break;
+        default:
+            break;
+        }
+        return;
+    }
+
+    uint16_t step = (memViewMode == MEM_VIEW_HEX_ASCII)
+                    ? (uint16_t)MEM_VIEW_COLS
+                    : 1u;
+
+    switch (key) {
+    case KEY_UP:
+        if (memViewMode == MEM_VIEW_INFO) break; /* no scroll in INFO */
+        if (memViewOffset >= step)
+            memViewOffset -= step;
+        else
+            memViewOffset = 0;
+        break;
+    case KEY_DOWN:
+        if (memViewMode == MEM_VIEW_INFO) break;
+        if ((uint32_t)(memViewOffset + step) < size)
+            memViewOffset += step;
+        else
+            memViewOffset = (uint16_t)(size > step ? size - step : 0u);
+        break;
+    case KEY_MENU:
+        memViewMode = (MemViewMode_t)((memViewMode + 1u) % MEM_VIEW_MODE_COUNT);
+        /* keep offset in-bounds after mode switch */
+        if (memViewOffset >= (uint16_t)size)
+            memViewOffset = (uint16_t)(size - 1u);
+        break;
+    case KEY_EXIT:
+        SetState(MEM_BUFFERS);
+        break;
+    default:
+        break;
+    }
+}
+
+/* ----------------------------------------------------------------------- */
+
 static void RenderRAMView(void)
 {
     char buf[32];
@@ -2770,7 +3118,7 @@ static void RenderRAMView(void)
     for (uint8_t px = 0; px < 128; ++px)
         for (uint8_t py = 0; py < 7; ++py)
             PutPixel(px, py, true);
-    GUI_DisplaySmallest("RAM STATS [EXIT=back]", 1, 1, false, false);
+    GUI_DisplaySmallest("RAM STATS [MENU=bufs]", 1, 1, false, false);
 
     /* ---- data rows ---- */
     y = 9;
@@ -2807,6 +3155,12 @@ static void OnKeyDownRAMView(uint8_t key)
 {
     BACKLIGHT_TurnOn();
     switch (key) {
+    case KEY_MENU:
+        /* Navigate forward to the buffer list screen. */
+        memBufSelectedIndex = 0;
+        memBufScrollOffset  = 0;
+        SetState(MEM_BUFFERS);
+        break;
     case KEY_EXIT:
         /* Return to the spectrum view that was active before RAM_VIEW. */
         SetState(SPECTRUM);
@@ -2844,6 +3198,12 @@ static void Render() {
     break;
     case RAM_VIEW:
       RenderRAMView();
+    break;
+    case MEM_BUFFERS:
+      RenderMemBuffers();
+    break;
+    case MEM_VIEWER:
+      RenderMemViewer();
     break;
 #ifdef ENABLE_SCANLIST_SHOW_DETAIL
     case SCANLIST_CHANNELS: // NOWY CASE
@@ -2891,6 +3251,12 @@ if (kbd.counter == 2 || (kbd.counter > 22 && (kbd.counter % 20 == 0))) {
                 break;
             case RAM_VIEW:
                 OnKeyDownRAMView(kbd.current);
+                break;
+            case MEM_BUFFERS:
+                OnKeyDownMemBuffers(kbd.current);
+                break;
+            case MEM_VIEWER:
+                OnKeyDownMemViewer(kbd.current);
                 break;
         #ifdef ENABLE_SCANLIST_SHOW_DETAIL
             case SCANLIST_CHANNELS:
