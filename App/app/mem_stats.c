@@ -52,11 +52,11 @@ caddr_t _sbrk(int incr)
 
     /*
      * Reject the allocation if the new heap break would intrude on the stack
-     * region (including the guard).  Use _estack as the upper bound when the
-     * compiler has not yet used the stack (sp == _estack), which would make
-     * the comparison trivially safe; in that case use _estack directly.
+     * region (including the guard).  Use min(sp, _estack) as the limit —
+     * normally sp < _estack (stack grows downward from _estack), but cap at
+     * _estack in case sp is somehow invalid.
      */
-    char *stack_limit = (sp < &_estack) ? sp : &_estack;
+    char *stack_limit = (sp > &_estack) ? &_estack : sp;
 
     if (new_ptr + (int)HEAP_STACK_GUARD >= stack_limit) {
         errno = ENOMEM;
