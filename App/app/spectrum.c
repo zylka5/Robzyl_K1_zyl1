@@ -1,5 +1,6 @@
 //K1 Spectrum
 #include "app/spectrum.h"
+#include "app/mem_stats.h"
 #include "audio.h"
 #include "scanner.h"
 #include "driver/backlight.h"
@@ -13,6 +14,7 @@
 #include "driver/py25q16.h"
 #include "version.h"
 #include "debugging.h"
+#include <stdlib.h>
 
 #ifdef ENABLE_FEAT_F4HWN_SCREENSHOT
     #include "screenshot.h"
@@ -102,6 +104,8 @@ static void BuildValidScanListIndices();
 static void RenderHistoryList();
 static void RenderScanListSelect();
 static void RenderParametersSelect();
+static void RenderRAMView();
+static void OnKeyDownRAMView(uint8_t key);
 static void UpdateScan();
 static uint8_t bandListSelectedIndex = 0;
 static int bandListScrollOffset = 0;
@@ -153,11 +157,13 @@ static bool refreshScanListName = true;
 static bool IsBlacklisted(uint32_t f);
 
 /***************************BIG RAM******************************************/
+/* These four large buffers are allocated on the heap when spectrum starts
+ * and freed on exit, reducing the static RAM footprint. */
 
-static	uint32_t ScanFrequencies[MR_CHANNEL_LAST +1];
-static uint32_t    HFreqs[HISTORY_SIZE];
-static uint8_t     HCount[HISTORY_SIZE];
-static bool  HBlacklisted[HISTORY_SIZE];
+static uint32_t *ScanFrequencies = NULL;
+static uint32_t *HFreqs          = NULL;
+static uint8_t  *HCount          = NULL;
+static bool     *HBlacklisted    = NULL;
 
 /****************************************************************************/
 
@@ -628,6 +634,7 @@ typedef struct HistoryStruct {
 static bool historyLoaded = false; // flaga stanu wczytania histotii spectrum
 
 void ReadHistory(void) {
+    if (!HFreqs || !HCount || !HBlacklisted) return;
     HistoryStruct History = {0};
     for (uint16_t position = 0; position < HISTORY_SIZE; position++) {
         PY25Q16_ReadBuffer(ADRESS_HISTORY + position * sizeof(HistoryStruct),
@@ -651,6 +658,7 @@ void ReadHistory(void) {
 
 
 void WriteHistory(void) {
+    if (!HFreqs || !HCount || !HBlacklisted) return;
     HistoryStruct History = {0};
     for (uint16_t position = 0; position < indexFs; position++) {
         History.HFreqs = HFreqs[position];
@@ -2051,9 +2059,9 @@ static void OnKeyDown(uint8_t key) {
 
     case KEY_8://СМЕНА РЕЖИМА
       if (historyListActive) {
-          memset(HFreqs,0,sizeof(HFreqs));
-          memset(HCount,0,sizeof(HCount));
-          memset(HBlacklisted,0,sizeof(HBlacklisted));
+          memset(HFreqs,0, HISTORY_SIZE * sizeof(uint32_t));
+          memset(HCount,0, HISTORY_SIZE * sizeof(uint8_t));
+          memset(HBlacklisted,0, HISTORY_SIZE * sizeof(bool));
           historyListIndex = 0;
           historyScrollOffset = 0;
           indexFs = 0;
@@ -2067,6 +2075,9 @@ static void OnKeyDown(uint8_t key) {
               if (ShowLines == 2) viewName = "BIG";
               sprintf(viewText, "VIEW: %s", viewName);
               ShowOSDPopup(viewText);
+          } else {
+              /* Alternative (non-classic) view: KEY_8 opens RAM diagnostics. */
+              SetState(RAM_VIEW);
           }
       }
     break;
@@ -2750,6 +2761,62 @@ static void RenderStill() {
 }
 
 
+static void RenderRAMView(void)
+{
+    char buf[32];
+    uint8_t y;
+
+    /* ---- header row (inverted) ---- */
+    for (uint8_t px = 0; px < 128; ++px)
+        for (uint8_t py = 0; py < 7; ++py)
+            PutPixel(px, py, true);
+    GUI_DisplaySmallest("RAM STATS [EXIT=back]", 1, 1, false, false);
+
+    /* ---- data rows ---- */
+    y = 9;
+    uint32_t stat  = MemStats_GetStaticRAM();
+    uint32_t hused = MemStats_GetHeapUsed();
+    uint32_t hpeak = MemStats_GetHeapPeak();
+    uint32_t hfree = MemStats_GetFreeGap();
+    uint32_t total = MemStats_GetRAMTotal();
+
+    snprintf(buf, sizeof(buf), ".data+.bss: %5lu B", (unsigned long)stat);
+    GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
+
+    snprintf(buf, sizeof(buf), "Heap now:   %5lu B", (unsigned long)hused);
+    GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
+
+    snprintf(buf, sizeof(buf), "Heap peak:  %5lu B", (unsigned long)hpeak);
+    GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
+
+    snprintf(buf, sizeof(buf), "Free gap:   %5lu B", (unsigned long)hfree);
+    GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
+
+    /* RAM usage percentage (integer arithmetic, no floats) */
+    uint32_t used_total = stat + hpeak;
+    uint16_t pct = (used_total <= total) ? (uint16_t)((used_total * 100u) / total) : 100u;
+    snprintf(buf, sizeof(buf), "RAM total: %5lu B", (unsigned long)total);
+    GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
+
+    snprintf(buf, sizeof(buf), "Used: %lu+%lu=%u%%", (unsigned long)stat,
+             (unsigned long)hpeak, (unsigned)pct);
+    GUI_DisplaySmallest(buf, 1, y, false, true);
+}
+
+static void OnKeyDownRAMView(uint8_t key)
+{
+    BACKLIGHT_TurnOn();
+    switch (key) {
+    case KEY_EXIT:
+        /* Return to the spectrum view that was active before RAM_VIEW. */
+        SetState(SPECTRUM);
+        break;
+    default:
+        break;
+    }
+}
+
+
 static void Render() {
   memset(gFrameBuffer, 0, sizeof(gFrameBuffer));
   
@@ -2774,6 +2841,9 @@ static void Render() {
     break;
     case PARAMETERS_SELECT:
       RenderParametersSelect();
+    break;
+    case RAM_VIEW:
+      RenderRAMView();
     break;
 #ifdef ENABLE_SCANLIST_SHOW_DETAIL
     case SCANLIST_CHANNELS: // NOWY CASE
@@ -2818,6 +2888,9 @@ if (kbd.counter == 2 || (kbd.counter > 22 && (kbd.counter % 20 == 0))) {
                 break;
             case PARAMETERS_SELECT:
                 OnKeyDown(kbd.current);
+                break;
+            case RAM_VIEW:
+                OnKeyDownRAMView(kbd.current);
                 break;
         #ifdef ENABLE_SCANLIST_SHOW_DETAIL
             case SCANLIST_CHANNELS:
@@ -3068,6 +3141,41 @@ uint16_t BOARD_gMR_fetchChannel(const uint32_t freq)
 
 void APP_RunSpectrum(void)
 {
+    /* Allocate large heap buffers on first entry (or after a previous free).
+     * Keeps them alive across mode-change restarts (continue in the for loop)
+     * but frees them on normal exit so RAM is reclaimed when spectrum is idle. */
+    if (ScanFrequencies == NULL || HFreqs == NULL ||
+        HCount == NULL || HBlacklisted == NULL)
+    {
+        /* Free any partial allocations from a failed previous attempt. */
+        free(ScanFrequencies); ScanFrequencies = NULL;
+        free(HFreqs);          HFreqs          = NULL;
+        free(HCount);          HCount          = NULL;
+        free(HBlacklisted);    HBlacklisted    = NULL;
+
+        ScanFrequencies = malloc((MR_CHANNEL_LAST + 1) * sizeof(uint32_t));
+        HFreqs          = malloc(HISTORY_SIZE * sizeof(uint32_t));
+        HCount          = malloc(HISTORY_SIZE * sizeof(uint8_t));
+        HBlacklisted    = malloc(HISTORY_SIZE * sizeof(bool));
+
+        if (!ScanFrequencies || !HFreqs || !HCount || !HBlacklisted) {
+            /* Allocation failed — release partial allocations and bail out. */
+            free(ScanFrequencies); ScanFrequencies = NULL;
+            free(HFreqs);          HFreqs          = NULL;
+            free(HCount);          HCount          = NULL;
+            free(HBlacklisted);    HBlacklisted    = NULL;
+            return;
+        }
+
+        memset(ScanFrequencies, 0, (MR_CHANNEL_LAST + 1) * sizeof(uint32_t));
+        memset(HFreqs,          0, HISTORY_SIZE * sizeof(uint32_t));
+        memset(HCount,          0, HISTORY_SIZE * sizeof(uint8_t));
+        memset(HBlacklisted,    0, HISTORY_SIZE * sizeof(bool));
+
+        /* Force history to be reloaded from EEPROM into the fresh buffers. */
+        historyLoaded = false;
+    }
+
     for (;;) {
         Mode mode;
         if (!Key_1_pressed || gComeBack) LoadSettings(); 
@@ -3120,10 +3228,16 @@ void APP_RunSpectrum(void)
         if (gSpectrumChangeRequested) {
             Spectrum_state = gRequestedSpectrumState;
             gSpectrumChangeRequested = false;
-            RestoreRegisters(); 
+            RestoreRegisters();
+            /* Buffers stay allocated — the mode-change restart reuses them. */
             continue;
         } else {
             RestoreRegisters();
+            /* Free heap buffers on normal exit so RAM is reclaimed. */
+            free(ScanFrequencies); ScanFrequencies = NULL;
+            free(HFreqs);          HFreqs          = NULL;
+            free(HCount);          HCount          = NULL;
+            free(HBlacklisted);    HBlacklisted    = NULL;
             break;
         }
 
@@ -3142,8 +3256,8 @@ uint16_t RADIO_ValidMemoryChannelsCount(bool bCheckScanList, uint8_t CurrentScan
 
 static void LoadActiveScanFrequencies(void)
 {   if(appMode!=CHANNEL_MODE)return;
-    //memset(ScanFrequencies, 0, (MR_CHANNEL_LAST + 1) * sizeof(uint32_t));
-    memset(ScanFrequencies,0,sizeof(ScanFrequencies));
+    if (!ScanFrequencies) return;
+    memset(ScanFrequencies, 0, (MR_CHANNEL_LAST + 1) * sizeof(uint32_t));
     scanChannelsCount = 0;
     ChannelAttributes_t cache;
     for (uint16_t ch = MR_CHANNEL_FIRST; ch <= MR_CHANNEL_LAST; ch++)
@@ -3334,9 +3448,10 @@ static void SaveSettings()
 
 static void ClearHistory() 
 {
-    memset(HFreqs,0,sizeof(HFreqs));
-    memset(HCount,0,sizeof(HCount));
-    memset(HBlacklisted,0,sizeof(HBlacklisted));
+    if (!HFreqs || !HCount || !HBlacklisted) return;
+    memset(HFreqs, 0, HISTORY_SIZE * sizeof(uint32_t));
+    memset(HCount, 0, HISTORY_SIZE * sizeof(uint8_t));
+    memset(HBlacklisted, 0, HISTORY_SIZE * sizeof(bool));
     historyListIndex = 0;
     historyScrollOffset = 0;
     indexFs = HISTORY_SIZE;

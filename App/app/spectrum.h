@@ -103,6 +103,7 @@ typedef enum State {
   BAND_LIST_SELECT,
   SCANLIST_SELECT,
   PARAMETERS_SELECT,
+  RAM_VIEW,           // diagnostyczny widok pamięci RAM
   #ifdef ENABLE_SCANLIST_SHOW_DETAIL
   SCANLIST_CHANNELS,  // NOWY STAN
   #endif
