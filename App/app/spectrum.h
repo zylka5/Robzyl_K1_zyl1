@@ -104,6 +104,8 @@ typedef enum State {
   SCANLIST_SELECT,
   PARAMETERS_SELECT,
   RAM_VIEW,           // diagnostyczny widok pamięci RAM
+  MEM_BUFFERS,        // lista głównych buforów/tablic
+  MEM_VIEWER,         // podgląd hex/bin wybranego bufora
   #ifdef ENABLE_SCANLIST_SHOW_DETAIL
   SCANLIST_CHANNELS,  // NOWY STAN
   #endif
