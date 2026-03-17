@@ -107,6 +107,9 @@ typedef enum State {
   MEM_BUFFERS,        // lista głównych buforów/tablic
   MEM_VIEWER,         // podgląd hex+ascii/bin/info wybranego bufora
   CPU_VIEW,           // informacje o CPU i bieżąca temperatura
+  VOICE_DIAG_VIEW,    // diagnostyka komunikatów głosowych
+  EEPROM_VIEW,        // lista adresów startowych EEPROM
+  EEPROM_DETAIL,      // podgląd hex+ascii od wybranego adresu EEPROM
   #ifdef ENABLE_SCANLIST_SHOW_DETAIL
   SCANLIST_CHANNELS,  // NOWY STAN
   #endif
