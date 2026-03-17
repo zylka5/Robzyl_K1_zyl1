@@ -8,6 +8,7 @@ target_sources(App INTERFACE
     # Drivers
     driver/backlight.c
     driver/bk4829.c
+    driver/cpu_temp.c
     driver/py25q16.c
     driver/gpio.c
     driver/i2c.c
