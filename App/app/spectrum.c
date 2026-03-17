@@ -113,6 +113,12 @@ static void RenderMemBuffers();
 static void OnKeyDownMemBuffers(uint8_t key);
 static void RenderMemViewer();
 static void OnKeyDownMemViewer(uint8_t key);
+static void RenderVoiceDiag();
+static void OnKeyDownVoiceDiag(uint8_t key);
+static void RenderEepromList();
+static void OnKeyDownEepromList(uint8_t key);
+static void RenderEepromDetail();
+static void OnKeyDownEepromDetail(uint8_t key);
 static void UpdateScan();
 static uint8_t bandListSelectedIndex = 0;
 static int bandListScrollOffset = 0;
@@ -127,6 +133,14 @@ static uint8_t validScanListCount = 0;
 static uint8_t memBufSelectedIndex = 0;   /* selected entry in MEM_BUFFERS */
 static uint8_t memBufScrollOffset  = 0;   /* scroll offset for MEM_BUFFERS list */
 static uint16_t memViewOffset      = 0;   /* byte offset into buffer in MEM_VIEWER */
+
+/* ---- Voice Diagnostics state ------------------------------------------ */
+static uint8_t voiceDiagSelectedIndex = 0;
+static uint8_t voiceDiagScrollOffset  = 0;
+
+/* ---- EEPROM Viewer state ----------------------------------------------- */
+static uint8_t  eepromListSelectedIndex = 0;
+static uint16_t eepromDetailOffset      = 0;
 
 typedef enum {
     MEM_VIEW_HEX_ASCII = 0, /* wide HEX+ASCII, 6 bytes per row (default) */
@@ -3182,37 +3196,31 @@ static void OnKeyDownRAMView(uint8_t key)
 static void RenderCPUView(void)
 {
     char buf[32];
-    uint8_t y;
 
     /* ---- header row (inverted) ---- */
     for (uint8_t px = 0; px < 128; ++px)
         for (uint8_t py = 0; py < 7; ++py)
             PutPixel(px, py, true);
-    GUI_DisplaySmallest("CPU INFO [8=RAM]", 1, 1, false, false);
+    GUI_DisplaySmallest("CPU INFO [8=VOICE]", 1, 1, false, false);
 
-    /* ---- CPU unique ID ---- */
-    y = 9;
-    uint32_t uid0, uid1, uid2;
-    CpuInfo_GetUID(&uid0, &uid1, &uid2);
-
-    snprintf(buf, sizeof(buf), "UID0: %08lX", (unsigned long)uid0);
-    GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
-
-    snprintf(buf, sizeof(buf), "UID1: %08lX", (unsigned long)uid1);
-    GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
-
-    snprintf(buf, sizeof(buf), "UID2: %08lX", (unsigned long)uid2);
-    GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
-
-    /* ---- separator ---- */
-    y += 2;
-
-    /* ---- CPU temperature ---- */
+    /* ---- CPU temperature (large font) ---- */
     int16_t temp_dc = CpuTemp_ReadDeciCelsius();
     int16_t t_int  = temp_dc / 10;
     int16_t t_frac = (int16_t)abs(temp_dc % 10);
-    snprintf(buf, sizeof(buf), "Temp: %d.%d degC", (int)t_int, (int)t_frac);
-    GUI_DisplaySmallest(buf, 1, y, false, true);
+    snprintf(buf, sizeof(buf), "%d.%d C", (int)t_int, (int)t_frac);
+    /* UI_PrintString: centred between x=0..127, line index 1 (~row 8) */
+    UI_PrintString(buf, 0, 127, 1, 8);
+
+    /* ---- Ambient temperature estimate ---- */
+    /* ambient_est = cpu_temp - CPU_AMBIENT_OFFSET (default 8.0 degC) */
+#define CPU_AMBIENT_OFFSET_DC  80   /* 8.0 degC in deci-Celsius */
+    int16_t amb_dc = temp_dc - CPU_AMBIENT_OFFSET_DC;
+    int16_t a_int  = amb_dc / 10;
+    int16_t a_frac = (int16_t)abs(amb_dc % 10);
+    snprintf(buf, sizeof(buf), "Amb~%d.%d C", (int)a_int, (int)a_frac);
+    /* Large font (UI_PrintString) occupies line 1, which is ~8px tall with 8px char height.
+     * Line 1 ends at approximately pixel row 8+8+8=24; leave a small gap -> row 33. */
+    GUI_DisplaySmallest(buf, 1, 33, false, true);
 }
 
 static void OnKeyDownCPUView(uint8_t key)
@@ -3220,12 +3228,324 @@ static void OnKeyDownCPUView(uint8_t key)
     BACKLIGHT_TurnOn();
     switch (key) {
     case KEY_8:
-        /* Cycle back to RAM diagnostics. */
-        SetState(RAM_VIEW);
+        /* Cycle forward: CPU_VIEW -> VOICE_DIAG_VIEW */
+        SetState(VOICE_DIAG_VIEW);
         break;
     case KEY_EXIT:
         /* Return to the spectrum view. */
         SetState(SPECTRUM);
+        break;
+    default:
+        break;
+    }
+}
+
+/* ===================================================================== */
+/* VOICE DIAGNOSTICS SCREEN                                              */
+/* ===================================================================== */
+
+#ifdef ENABLE_VOICE
+
+typedef struct {
+    const char    *label;
+    VOICE_ID_t     id;
+} VoiceDiagEntry_t;
+
+static const VoiceDiagEntry_t voice_diag_list[] = {
+    { "WELCOME",    VOICE_ID_WELCOME                       },
+    { "LOCK",       VOICE_ID_LOCK                          },
+    { "UNLOCK",     VOICE_ID_UNLOCK                        },
+    { "SCAN BEGIN", VOICE_ID_SCANNING_BEGIN                },
+    { "SCAN STOP",  VOICE_ID_SCANNING_STOP                 },
+    { "SCRAMB ON",  VOICE_ID_SCRAMBLER_ON                  },
+    { "SCRAMB OFF", VOICE_ID_SCRAMBLER_OFF                 },
+    { "FUNCTION",   VOICE_ID_FUNCTION                      },
+    { "CTCSS",      VOICE_ID_CTCSS                         },
+    { "DCS",        VOICE_ID_DCS                           },
+    { "POWER",      VOICE_ID_POWER                         },
+    { "SAVE MODE",  VOICE_ID_SAVE_MODE                     },
+    { "MEM CHAN",   VOICE_ID_MEMORY_CHANNEL                },
+    { "DEL CHAN",   VOICE_ID_DELETE_CHANNEL                },
+    { "FREQ STEP",  VOICE_ID_FREQUENCY_STEP                },
+    { "SQUELCH",    VOICE_ID_SQUELCH                       },
+    { "TOT",        VOICE_ID_TRANSMIT_OVER_TIME            },
+    { "BACKLIGHT",  VOICE_ID_BACKLIGHT_SELECTION           },
+    { "VOX",        VOICE_ID_VOX                           },
+    { "TX OFFSET",  VOICE_ID_TX_OFFSET_FREQUENCY           },
+    { "EMERGENCY",  VOICE_ID_EMERGENCY_CALL                },
+    { "LOW VOLT",   VOICE_ID_LOW_VOLTAGE                   },
+    { "CH MODE",    VOICE_ID_CHANNEL_MODE                  },
+    { "FREQ MODE",  VOICE_ID_FREQUENCY_MODE                },
+    { "VOICE",      VOICE_ID_VOICE_PROMPT                  },
+    { "BAND SEL",   VOICE_ID_BAND_SELECTION                },
+    { "DUAL STBY",  VOICE_ID_DUAL_STANDBY                  },
+    { "CH BW",      VOICE_ID_CHANNEL_BANDWIDTH             },
+    { "OPT SIG",    VOICE_ID_OPTIONAL_SIGNAL               },
+    { "MUTE",       VOICE_ID_MUTE_MODE                     },
+    { "BUSY LOCK",  VOICE_ID_BUSY_LOCKOUT                  },
+    { "BEEP",       VOICE_ID_BEEP_PROMPT                   },
+    { "ANI CODE",   VOICE_ID_ANI_CODE                      },
+    { "INIT",       VOICE_ID_INITIALISATION                },
+    { "CONFIRM",    VOICE_ID_CONFIRM                       },
+    { "CANCEL",     VOICE_ID_CANCEL                        },
+    { "ON",         VOICE_ID_ON                            },
+    { "OFF",        VOICE_ID_OFF                           },
+    { "MENU",       VOICE_ID_MENU                          },
+    { "REPEATER",   VOICE_ID_REPEATER                      },
+    { "0",          VOICE_ID_0                             },
+    { "1",          VOICE_ID_1                             },
+    { "2",          VOICE_ID_2                             },
+    { "3",          VOICE_ID_3                             },
+    { "4",          VOICE_ID_4                             },
+    { "5",          VOICE_ID_5                             },
+    { "6",          VOICE_ID_6                             },
+    { "7",          VOICE_ID_7                             },
+    { "8",          VOICE_ID_8                             },
+    { "9",          VOICE_ID_9                             },
+    { "10",         VOICE_ID_10                            },
+    { "100",        VOICE_ID_100                           },
+};
+#define VOICE_DIAG_COUNT ((uint8_t)(sizeof(voice_diag_list) / sizeof(voice_diag_list[0])))
+#define VOICE_DIAG_ROWS  6
+
+static void RenderVoiceDiag(void)
+{
+    char buf[32];
+
+    /* inverted header */
+    for (uint8_t px = 0; px < 128; ++px)
+        for (uint8_t py = 0; py < 7; ++py)
+            PutPixel(px, py, true);
+    GUI_DisplaySmallest("VOICE DIAG [MENU=play]", 1, 1, false, false);
+
+    /* clamp scroll */
+    if (voiceDiagSelectedIndex >= VOICE_DIAG_COUNT)
+        voiceDiagSelectedIndex = VOICE_DIAG_COUNT - 1u;
+    if (voiceDiagSelectedIndex < voiceDiagScrollOffset)
+        voiceDiagScrollOffset = voiceDiagSelectedIndex;
+    if (voiceDiagSelectedIndex >= voiceDiagScrollOffset + VOICE_DIAG_ROWS)
+        voiceDiagScrollOffset = voiceDiagSelectedIndex - VOICE_DIAG_ROWS + 1u;
+
+    uint8_t y = 9;
+    for (uint8_t i = 0; i < VOICE_DIAG_ROWS; ++i) {
+        uint8_t idx = voiceDiagScrollOffset + i;
+        if (idx >= VOICE_DIAG_COUNT) break;
+
+        snprintf(buf, sizeof(buf), "%02X %-12s", (unsigned)voice_diag_list[idx].id,
+                 voice_diag_list[idx].label);
+
+        bool selected = (idx == voiceDiagSelectedIndex);
+        if (selected) {
+            for (uint8_t px = 0; px < 128; ++px)
+                for (uint8_t py = y - 1; py < y + 7; ++py)
+                    PutPixel(px, py, true);
+            GUI_DisplaySmallest(buf, 1, y, false, false);
+        } else {
+            GUI_DisplaySmallest(buf, 1, y, false, true);
+        }
+        y += 8;
+    }
+}
+
+static void OnKeyDownVoiceDiag(uint8_t key)
+{
+    BACKLIGHT_TurnOn();
+    switch (key) {
+    case KEY_UP:
+        if (voiceDiagSelectedIndex > 0)
+            --voiceDiagSelectedIndex;
+        else
+            voiceDiagSelectedIndex = VOICE_DIAG_COUNT - 1u;
+        break;
+    case KEY_DOWN:
+        if (voiceDiagSelectedIndex < VOICE_DIAG_COUNT - 1u)
+            ++voiceDiagSelectedIndex;
+        else
+            voiceDiagSelectedIndex = 0;
+        break;
+    case KEY_MENU:
+        /* Play the selected voice prompt immediately */
+        AUDIO_SetVoiceID(0, voice_diag_list[voiceDiagSelectedIndex].id);
+        AUDIO_PlaySingleVoice(true);
+        break;
+    case KEY_8:
+        /* Cycle forward: VOICE_DIAG_VIEW -> EEPROM_VIEW */
+        SetState(EEPROM_VIEW);
+        break;
+    case KEY_EXIT:
+        SetState(SPECTRUM);
+        break;
+    default:
+        break;
+    }
+}
+
+#else /* !ENABLE_VOICE */
+
+static void RenderVoiceDiag(void)
+{
+    for (uint8_t px = 0; px < 128; ++px)
+        for (uint8_t py = 0; py < 7; ++py)
+            PutPixel(px, py, true);
+    GUI_DisplaySmallest("VOICE DIAG [8=EEPROM]", 1, 1, false, false);
+    GUI_DisplaySmallest("VOICE disabled", 1, 20, false, true);
+}
+
+static void OnKeyDownVoiceDiag(uint8_t key)
+{
+    BACKLIGHT_TurnOn();
+    if (key == KEY_8) SetState(EEPROM_VIEW);
+    else if (key == KEY_EXIT) SetState(SPECTRUM);
+}
+
+#endif /* ENABLE_VOICE */
+
+/* ===================================================================== */
+/* EEPROM VIEWER SCREEN                                                  */
+/* ===================================================================== */
+
+typedef struct {
+    const char *label;
+    uint32_t    addr;
+} EepromAddrEntry_t;
+
+static const EepromAddrEntry_t eeprom_addr_list[] = {
+    { "CHANNELS",  0x0000 },
+    { "STATE",     ADRESS_STATE   },
+    { "VERSION",   ADRESS_VERSION },
+    { "PARAMS",    ADRESS_PARAMS  },
+    { "HISTORY",   ADRESS_HISTORY },
+    { "BANDS",     ADRESS_BANDS   },
+    { "VOICE-CHI", 0x14C000 },
+    { "VOICE-ENG", 0x14C800 },
+    { "VOICE-DATA", 0x14D000 },
+};
+#define EEPROM_ADDR_COUNT  ((uint8_t)(sizeof(eeprom_addr_list) / sizeof(eeprom_addr_list[0])))
+#define EEPROM_LIST_ROWS   6
+#define EEPROM_VIEW_COLS   6
+#define EEPROM_VIEW_ROWS   6
+
+static void RenderEepromList(void)
+{
+    char buf[32];
+
+    /* inverted header */
+    for (uint8_t px = 0; px < 128; ++px)
+        for (uint8_t py = 0; py < 7; ++py)
+            PutPixel(px, py, true);
+    GUI_DisplaySmallest("EEPROM VIEW [MENU=go]", 1, 1, false, false);
+
+    uint8_t y = 9;
+    for (uint8_t i = 0; i < EEPROM_LIST_ROWS; ++i) {
+        if (i >= EEPROM_ADDR_COUNT) break;
+        snprintf(buf, sizeof(buf), "%06lX %-9s",
+                 (unsigned long)eeprom_addr_list[i].addr,
+                 eeprom_addr_list[i].label);
+        bool selected = (i == eepromListSelectedIndex);
+        if (selected) {
+            for (uint8_t px = 0; px < 128; ++px)
+                for (uint8_t py = y - 1; py < y + 7; ++py)
+                    PutPixel(px, py, true);
+            GUI_DisplaySmallest(buf, 1, y, false, false);
+        } else {
+            GUI_DisplaySmallest(buf, 1, y, false, true);
+        }
+        y += 8;
+    }
+}
+
+static void OnKeyDownEepromList(uint8_t key)
+{
+    BACKLIGHT_TurnOn();
+    switch (key) {
+    case KEY_UP:
+        if (eepromListSelectedIndex > 0)
+            --eepromListSelectedIndex;
+        else
+            eepromListSelectedIndex = EEPROM_ADDR_COUNT - 1u;
+        break;
+    case KEY_DOWN:
+        if (eepromListSelectedIndex < EEPROM_ADDR_COUNT - 1u)
+            ++eepromListSelectedIndex;
+        else
+            eepromListSelectedIndex = 0;
+        break;
+    case KEY_MENU:
+        eepromDetailOffset = 0;
+        SetState(EEPROM_DETAIL);
+        break;
+    case KEY_8:
+        /* Cycle: EEPROM_VIEW -> RAM_VIEW */
+        SetState(RAM_VIEW);
+        break;
+    case KEY_EXIT:
+        SetState(SPECTRUM);
+        break;
+    default:
+        break;
+    }
+}
+
+static void RenderEepromDetail(void)
+{
+    char    buf[40];
+    uint8_t y = 9;
+
+    /* inverted header */
+    for (uint8_t px = 0; px < 128; ++px)
+        for (uint8_t py = 0; py < 7; ++py)
+            PutPixel(px, py, true);
+    uint32_t base = eeprom_addr_list[eepromListSelectedIndex].addr;
+    snprintf(buf, sizeof(buf), "%.9s %06lX",
+             eeprom_addr_list[eepromListSelectedIndex].label,
+             (unsigned long)(base + eepromDetailOffset));
+    GUI_DisplaySmallest(buf, 1, 1, false, false);
+
+    /* read and display rows */
+    for (uint8_t row = 0; row < EEPROM_VIEW_ROWS; ++row) {
+        uint32_t off = (uint32_t)eepromDetailOffset + (uint32_t)(row * EEPROM_VIEW_COLS);
+        uint32_t addr = base + off;
+        uint8_t raw[EEPROM_VIEW_COLS];
+        PY25Q16_ReadBuffer(addr, raw, EEPROM_VIEW_COLS);
+
+        int nr = snprintf(buf, sizeof(buf), "%04lX:", (unsigned long)(off & 0xFFFFu));
+        uint8_t n = (nr > 0 && nr < (int)sizeof(buf)) ? (uint8_t)nr : (uint8_t)(sizeof(buf) - 1u);
+        uint8_t ascii_col[EEPROM_VIEW_COLS];
+        for (uint8_t col = 0; col < EEPROM_VIEW_COLS; ++col) {
+            uint8_t b = raw[col];
+            if (n + 4u < sizeof(buf)) {
+                int r = snprintf(buf + n, sizeof(buf) - n, " %02X", (unsigned)b);
+                if (r > 0 && r < (int)(sizeof(buf) - n))
+                    n = (uint8_t)(n + (uint8_t)r);
+            }
+            ascii_col[col] = (b >= 0x20u && b <= 0x7Eu) ? b : (uint8_t)'.';
+        }
+        if (n + 2u < sizeof(buf)) { buf[n++] = ' '; buf[n++] = ' '; }
+        for (uint8_t col = 0; col < EEPROM_VIEW_COLS && n + 1u < sizeof(buf); ++col)
+            buf[n++] = (char)ascii_col[col];
+        buf[n] = '\0';
+
+        GUI_DisplaySmallest(buf, 1, y, false, true);
+        y += 8;
+    }
+}
+
+static void OnKeyDownEepromDetail(uint8_t key)
+{
+    BACKLIGHT_TurnOn();
+    const uint16_t step = (uint16_t)EEPROM_VIEW_COLS;
+    switch (key) {
+    case KEY_UP:
+        if (eepromDetailOffset >= step)
+            eepromDetailOffset -= step;
+        else
+            eepromDetailOffset = 0;
+        break;
+    case KEY_DOWN:
+        eepromDetailOffset += step;
+        break;
+    case KEY_EXIT:
+        SetState(EEPROM_VIEW);
         break;
     default:
         break;
@@ -3269,6 +3589,15 @@ static void Render() {
     break;
     case CPU_VIEW:
       RenderCPUView();
+    break;
+    case VOICE_DIAG_VIEW:
+      RenderVoiceDiag();
+    break;
+    case EEPROM_VIEW:
+      RenderEepromList();
+    break;
+    case EEPROM_DETAIL:
+      RenderEepromDetail();
     break;
 #ifdef ENABLE_SCANLIST_SHOW_DETAIL
     case SCANLIST_CHANNELS: // NOWY CASE
@@ -3325,6 +3654,15 @@ if (kbd.counter == 2 || (kbd.counter > 22 && (kbd.counter % 20 == 0))) {
                 break;
             case CPU_VIEW:
                 OnKeyDownCPUView(kbd.current);
+                break;
+            case VOICE_DIAG_VIEW:
+                OnKeyDownVoiceDiag(kbd.current);
+                break;
+            case EEPROM_VIEW:
+                OnKeyDownEepromList(kbd.current);
+                break;
+            case EEPROM_DETAIL:
+                OnKeyDownEepromDetail(kbd.current);
                 break;
         #ifdef ENABLE_SCANLIST_SHOW_DETAIL
             case SCANLIST_CHANNELS:
