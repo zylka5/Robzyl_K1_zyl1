@@ -29,6 +29,7 @@
 
 #define VOICE_BUF_SIZE (sizeof(uint16_t) * VOICE_BUF_LEN)
 
+
 static uint16_t DAC_Buf[VOICE_BUF_LEN * 2];
 
 static inline void DMA_Init()
@@ -104,9 +105,10 @@ void VOICE_Start()
     {
         memset(DAC_Buf, 0, VOICE_BUF_SIZE);
     }
+
     if (gVoiceBufLen > 0)
     {
-        memcpy(DAC_Buf + VOICE_BUF_SIZE,      //
+        memcpy(DAC_Buf + VOICE_BUF_LEN,      //
                gVoiceBuf[gVoiceBufReadIndex], //
                VOICE_BUF_SIZE                 //
         );
@@ -115,13 +117,13 @@ void VOICE_Start()
     }
     else
     {
-        memset(DAC_Buf + VOICE_BUF_SIZE, 0, VOICE_BUF_SIZE);
+        memset(DAC_Buf + VOICE_BUF_LEN, 0, VOICE_BUF_SIZE);
     }
 
-    LL_DMA_ConfigAddresses(DMA1, DMA_CHANNEL, DAC_Buf,                                                         //
-                           LL_DAC_DMA_GetRegAddr(DAC1, DAC_CHANNEL, LL_DAC_DMA_REG_DATA_12BITS_RIGHT_ALIGNED), //
-                           LL_DMA_DIRECTION_MEMORY_TO_PERIPH                                                   //
-    );
+    LL_DMA_ConfigAddresses(DMA1, DMA_CHANNEL,
+                           (uint32_t)DAC_Buf,
+                           LL_DAC_DMA_GetRegAddr(DAC1, DAC_CHANNEL, LL_DAC_DMA_REG_DATA_12BITS_RIGHT_ALIGNED),
+                           LL_DMA_DIRECTION_MEMORY_TO_PERIPH);
     LL_DMA_EnableChannel(DMA1, DMA_CHANNEL);
     LL_TIM_EnableCounter(TIMx);
 }
@@ -149,12 +151,13 @@ void DMA1_Channel2_3_IRQHandler()
             memset(DAC_Buf, 0, VOICE_BUF_SIZE);
         }
     }
+
     if (LL_DMA_IsActiveFlag_TC3(DMA1))
     {
         LL_DMA_ClearFlag_TC3(DMA1);
         if (gVoiceBufLen > 0)
         {
-            memcpy(DAC_Buf + VOICE_BUF_SIZE,      //
+            memcpy(DAC_Buf + VOICE_BUF_LEN,      //
                    gVoiceBuf[gVoiceBufReadIndex], //
                    VOICE_BUF_SIZE                 //
             );
@@ -163,7 +166,7 @@ void DMA1_Channel2_3_IRQHandler()
         }
         else
         {
-            memset(DAC_Buf + VOICE_BUF_SIZE, 0, VOICE_BUF_SIZE);
+            memset(DAC_Buf + VOICE_BUF_LEN, 0, VOICE_BUF_SIZE);
         }
     }
 }
