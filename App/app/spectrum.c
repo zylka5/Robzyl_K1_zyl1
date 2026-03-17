@@ -14,6 +14,7 @@
 #include "driver/py25q16.h"
 #include "version.h"
 #include "debugging.h"
+#include "driver/cpu_temp.h"
 #include <stdlib.h>
 
 #ifdef ENABLE_FEAT_F4HWN_SCREENSHOT
@@ -106,6 +107,8 @@ static void RenderScanListSelect();
 static void RenderParametersSelect();
 static void RenderRAMView();
 static void OnKeyDownRAMView(uint8_t key);
+static void RenderCPUView();
+static void OnKeyDownCPUView(uint8_t key);
 static void RenderMemBuffers();
 static void OnKeyDownMemBuffers(uint8_t key);
 static void RenderMemViewer();
@@ -3161,8 +3164,67 @@ static void OnKeyDownRAMView(uint8_t key)
         memBufScrollOffset  = 0;
         SetState(MEM_BUFFERS);
         break;
+    case KEY_8:
+        /* Cycle forward to the CPU info screen. */
+        SetState(CPU_VIEW);
+        break;
     case KEY_EXIT:
         /* Return to the spectrum view that was active before RAM_VIEW. */
+        SetState(SPECTRUM);
+        break;
+    default:
+        break;
+    }
+}
+
+/* ----------------------------------------------------------------------- */
+
+static void RenderCPUView(void)
+{
+    char buf[32];
+    uint8_t y;
+
+    /* ---- header row (inverted) ---- */
+    for (uint8_t px = 0; px < 128; ++px)
+        for (uint8_t py = 0; py < 7; ++py)
+            PutPixel(px, py, true);
+    GUI_DisplaySmallest("CPU INFO [8=RAM]", 1, 1, false, false);
+
+    /* ---- CPU unique ID ---- */
+    y = 9;
+    uint32_t uid0, uid1, uid2;
+    CpuInfo_GetUID(&uid0, &uid1, &uid2);
+
+    snprintf(buf, sizeof(buf), "UID0: %08lX", (unsigned long)uid0);
+    GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
+
+    snprintf(buf, sizeof(buf), "UID1: %08lX", (unsigned long)uid1);
+    GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
+
+    snprintf(buf, sizeof(buf), "UID2: %08lX", (unsigned long)uid2);
+    GUI_DisplaySmallest(buf, 1, y, false, true); y += 8;
+
+    /* ---- separator ---- */
+    y += 2;
+
+    /* ---- CPU temperature ---- */
+    int16_t temp_dc = CpuTemp_ReadDeciCelsius();
+    int16_t t_int  = temp_dc / 10;
+    int16_t t_frac = (int16_t)abs(temp_dc % 10);
+    snprintf(buf, sizeof(buf), "Temp: %d.%d degC", (int)t_int, (int)t_frac);
+    GUI_DisplaySmallest(buf, 1, y, false, true);
+}
+
+static void OnKeyDownCPUView(uint8_t key)
+{
+    BACKLIGHT_TurnOn();
+    switch (key) {
+    case KEY_8:
+        /* Cycle back to RAM diagnostics. */
+        SetState(RAM_VIEW);
+        break;
+    case KEY_EXIT:
+        /* Return to the spectrum view. */
         SetState(SPECTRUM);
         break;
     default:
@@ -3204,6 +3266,9 @@ static void Render() {
     break;
     case MEM_VIEWER:
       RenderMemViewer();
+    break;
+    case CPU_VIEW:
+      RenderCPUView();
     break;
 #ifdef ENABLE_SCANLIST_SHOW_DETAIL
     case SCANLIST_CHANNELS: // NOWY CASE
@@ -3257,6 +3322,9 @@ if (kbd.counter == 2 || (kbd.counter > 22 && (kbd.counter % 20 == 0))) {
                 break;
             case MEM_VIEWER:
                 OnKeyDownMemViewer(kbd.current);
+                break;
+            case CPU_VIEW:
+                OnKeyDownCPUView(kbd.current);
                 break;
         #ifdef ENABLE_SCANLIST_SHOW_DETAIL
             case SCANLIST_CHANNELS:
